@@ -1,0 +1,38 @@
+"""Souprise: Offline RAG for Business Data.
+
+Combines HDC (Hyperdimensional Computing) retrieval with LLM generation
+for fast, private, and synthetic data-powered business applications.
+
+Main components:
+- souprise.core: RAG pipeline (retrieval + generation)
+- souprise.data: Synthetic data generators
+- souprise.cli: Command-line interface
+
+Example usage:
+    from souprise import quickstart
+    rag = quickstart(n_data=10000, model_path="mlx-community/Phi-2-4bit")
+    result = rag.query("What are the open invoices?")
+    print(result.answer)
+
+CLI usage:
+    souprise chat --model mlx-community/Phi-2-4bit
+    souprise train generate --n 5000
+    souprise index info
+
+License: Apache-2.0
+Copyright 2026 Michael Kupermann
+"""
+
+__version__ = "0.1.0"
+
+from souprise.core.pipeline import SoupriseRAG, RAGConfig, RetrievalResult, GenerationResult, RAGResult, quickstart
+
+__all__ = [
+    "__version__",
+    "SoupriseRAG",
+    "RAGConfig", 
+    "RetrievalResult",
+    "GenerationResult",
+    "RAGResult",
+    "quickstart",
+]
