@@ -19,19 +19,21 @@
 
 ## What is Souprise?
 
-Souprise is a Retrieval-Augmented Generation (RAG) pipeline for business data that must stay on-premises. It replaces the usual embedding-model-plus-vector-database stack with **Hyperdimensional Computing (HDC)**: no neural network runs at indexing or search time, results are fully deterministic, and the index costs exactly **1,250 bytes per entry**. Every record becomes a 10,000-bit binary hypervector; similarity search is a vectorized XOR + popcount over the packed index, implemented in this repository with NumPy alone and verified by the test suite.
+Souprise is a Retrieval-Augmented Generation (RAG) pipeline for business data that must stay on-premises: it retrieves the records relevant to a question, and a language model on your own machine answers from those records. You get grounded answers over your ERP and CRM data without sending a byte of it to a cloud service.
 
-Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). Like Soup, Souprise is infrastructure-neutral: the generation backend is auto-detected — MLX on Apple Silicon, PyTorch on NVIDIA CUDA, AMD ROCm, or plain CPU — and the same code and commands work unchanged on Linux, macOS, and Windows.
-
-**Network access, stated precisely.** The built-in retriever operates only on local data, with no network path in the code. The quickstart downloads a public base model once from Hugging Face (anonymous download; no API key or account required); with a local `model_path` there is no download and no connection at all, including air-gapped environments. Fine-tuning with Soup likewise runs on your own hardware. Business data is never transmitted anywhere at any time.
-
-**Terminology in 30 seconds.**
+Five terms are enough to read the rest of this README:
 
 - **HDC (Hyperdimensional Computing)** — text represented as very long binary vectors (here: 10,000 bits); similar texts receive similar bit patterns, so search is inexpensive bitwise arithmetic instead of model inference.
+- **MLX** — Apple's machine-learning framework for M-series processors; PyTorch covers every other machine.
 - **Soup** — an open-source CLI for fine-tuning LLMs with LoRA, on MLX or PyTorch.
 - **LoRA** — fine-tuning via small adapter matrices instead of the full model; `r` and `alpha` control adapter size and strength.
 - **Alpaca format** — a simple JSONL layout for training examples: `instruction`, `input`, `output`.
-- **MLX** — Apple's machine-learning framework for M-series processors.
+
+Souprise replaces the usual embedding-model-plus-vector-database stack with HDC: no neural network runs at indexing or search time, results are fully deterministic, and the index occupies exactly **1,250 bytes per entry**. Every record becomes a 10,000-bit binary hypervector; similarity search is a vectorized XOR + popcount over the packed index, implemented in this repository with NumPy alone and verified by the test suite.
+
+Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). Like Soup, Souprise is infrastructure-neutral: the generation backend is auto-detected — MLX on Apple Silicon, PyTorch on NVIDIA CUDA, AMD ROCm, or plain CPU — and the same code and commands work unchanged on Linux, macOS, and Windows.
+
+**What touches the network, exactly.** The built-in retriever operates only on local data; there is no network path in its code. `quickstart()` downloads a public base model once from Hugging Face on first run (public models download without an API key); pass a local `model_path` instead and there is no download and no connection at all, including air-gapped environments. Fine-tuning with Soup likewise runs on your own hardware. Business data is never transmitted anywhere at any time. These guarantees cover the built-in components — if you inject a custom `BaseRetriever` or `BaseGenerator`, its network behavior is yours to vouch for.
 
 ## Design Principles
 
@@ -69,7 +71,7 @@ Performance figures are deliberately not published in this README. Every `RAGRes
 
 The built-in retriever is designed to work well past 10,000 records:
 
-- **Exact, chunked search** — Hamming distances are computed in fixed-size chunks (default 65,536 rows), so peak memory stays around 80 MB during search regardless of corpus size, while results remain exact.
+- **Exact, chunked search** — Hamming distances are computed in fixed-size chunks, so the temporary buffers are bounded by `chunk_rows` × 1,250 bytes (about 80 MB at the default of 65,536 rows) regardless of corpus size, while results remain exact. Chunked and unchunked search are verified equivalent by the test suite.
 - **O(n) top-k selection** — `argpartition` instead of a full sort.
 - **Hardware popcount** — uses `np.bitwise_count` on NumPy 2.x, with a lookup-table fallback on older versions.
 - **Incremental indexing** — `add(entries)` appends new records without re-encoding the existing index.
@@ -128,8 +130,10 @@ The full pipeline with a local LLM:
 ```python
 from souprise import quickstart
 
-# Indexes 10,000 synthetic business records and loads a local model.
-# Backend and default model are auto-detected for this machine.
+# Indexes 10,000 synthetic business records and loads a model.
+# Backend and default model are auto-detected for this machine; the base
+# model is downloaded once from Hugging Face on first run — pass
+# model_path="./your_local_model" for a fully offline start.
 rag = quickstart(n_data=10_000)
 
 result = rag.query("What are the open invoices for Customer_0123?")
@@ -211,13 +215,18 @@ from souprise import RAGConfig
 
 config = RAGConfig(
     retrieval_k=5,                  # top-k records fed into the prompt
-    model_path="./souprise_model",  # local path or Hugging Face ID (any causal LM)
+    model_path="./souprise_model",  # local path or any Hugging Face causal LM, e.g.
+                                    # "mistralai/Mistral-7B-Instruct-v0.3",
+                                    # "meta-llama/Llama-3.2-1B-Instruct",
+                                    # "Qwen/Qwen2.5-1.5B-Instruct"
     backend="auto",                 # "auto" | "mlx" (Apple Silicon) | "torch" (CUDA/ROCm/CPU)
     retriever="auto",               # "auto" | "simple" | "juicehdc"
     max_tokens=256,
     temperature=0.7,
 )
 ```
+
+The out-of-the-box defaults are chosen purely for download size, not vendor preference — override `model_path` with any vendor's model, local or from the Hub.
 
 ## Testing
 
