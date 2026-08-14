@@ -1,46 +1,62 @@
 Souprise
 Copyright 2026 Michael Kupermann
 
-This project integrates the following components under their respective licenses:
+This project uses the following components under their respective licenses.
 
-1. JuiceHDC (Cortex HDC)
-   - License: Apache License 2.0
-   - Source: https://github.com/mkupermann/JuiceHDC
-   - Copyright: Michael Kupermann
-   - Used as a dependency for HDC-based retrieval
+Core dependencies:
 
-2. Soup
-   - License: Apache License 2.0
-   - Source: https://github.com/MakazhanAlpamys/Soup
-   - Copyright: Soup Team
-   - Used as a dependency for LLM fine-tuning and inference
-
-3. MLX
-   - License: Apache License 2.0
-   - Source: https://github.com/ml-explore/mlx
-   - Copyright: Apple Inc.
-   - Used for Apple Silicon backend support
-
-4. NumPy
+1. NumPy
    - License: BSD 3-Clause
    - Source: https://github.com/numpy/numpy
    - Copyright: NumPy Developers
 
-5. FastAPI
-   - License: MIT License
-   - Source: https://github.com/tiangolo/fastapi
-   - Copyright: Sebastian Ramirez
-
-6. Typer
+2. Typer
    - License: MIT License
    - Source: https://github.com/tiangolo/typer
    - Copyright: Sebastian Ramirez
 
-7. Rich
+3. Rich
    - License: MIT License
    - Source: https://github.com/Textualize/rich
    - Copyright: Will McGugan
 
-The full text of each license is available in the LICENSE file or at the URLs provided above.
+Optional dependencies (installed via extras):
 
-This project is licensed under the Apache License 2.0. See the LICENSE file for details.
+4. JuiceHDC (Cortex HDC) — extra: juicehdc
+   - License: Apache License 2.0
+   - Source: https://github.com/mkupermann/JuiceHDC
+   - Copyright: Michael Kupermann
+   - Optional HDC retrieval engine
+
+5. Soup — extra: finetune
+   - License: Apache License 2.0
+   - Source: https://github.com/MakazhanAlpamys/Soup
+   - Copyright: Soup Team
+   - LLM fine-tuning
+
+6. MLX / mlx-lm — extra: mlx
+   - License: Apache License 2.0 / MIT License
+   - Source: https://github.com/ml-explore/mlx
+   - Copyright: Apple Inc.
+   - Apple Silicon inference backend
+
+7. PyTorch — extra: torch
+   - License: BSD 3-Clause
+   - Source: https://github.com/pytorch/pytorch
+   - Copyright: PyTorch Contributors
+   - CUDA/ROCm/CPU inference backend
+
+8. Hugging Face Transformers — extra: torch
+   - License: Apache License 2.0
+   - Source: https://github.com/huggingface/transformers
+   - Copyright: The HuggingFace Team
+
+9. FastAPI / Uvicorn / Pydantic — extra: api (planned REST mode)
+   - Licenses: MIT / BSD 3-Clause / MIT
+   - Sources: https://github.com/tiangolo/fastapi,
+     https://github.com/encode/uvicorn, https://github.com/pydantic/pydantic
+
+The full text of each license is available at the URLs provided above.
+
+This project is licensed under the Apache License 2.0. See the LICENSE file
+for details.

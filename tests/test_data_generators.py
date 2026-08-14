@@ -4,11 +4,10 @@ License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
-import pytest
 from souprise.data.generators.business import (
-    generate_business_data,
-    generate_alpaca_training_data,
     BusinessEntry,
+    generate_alpaca_training_data,
+    generate_business_data,
 )
 
 
@@ -23,7 +22,7 @@ class TestBusinessEntry:
             tags=["test", "example"]
         )
         result = entry.to_dict()
-        
+
         assert result["title"] == "Test Entry"
         assert result["content"] == "Test content"
         assert result["tags"] == ["test", "example"]
@@ -36,7 +35,7 @@ class TestBusinessEntry:
             tags=["invoice"]
         )
         result = entry.to_alpaca_format()
-        
+
         assert "instruction" in result
         assert "input" in result
         assert "output" in result
@@ -50,7 +49,7 @@ class TestBusinessEntry:
             tags=["test"]
         )
         result = entry.to_retrieval_format()
-        
+
         assert "id" in result
         assert "text" in result
         assert "metadata" in result
@@ -63,7 +62,7 @@ class TestGenerateBusinessData:
     def test_generate_default(self):
         """Test default data generation."""
         entries = generate_business_data(n=100, seed=42)
-        
+
         assert len(entries) == 100
         assert all(isinstance(e, BusinessEntry) for e in entries)
 
@@ -71,7 +70,7 @@ class TestGenerateBusinessData:
         """Test that generation is reproducible with same seed."""
         entries1 = generate_business_data(n=50, seed=42)
         entries2 = generate_business_data(n=50, seed=42)
-        
+
         assert len(entries1) == len(entries2)
         for e1, e2 in zip(entries1, entries2):
             assert e1.title == e2.title
@@ -81,7 +80,7 @@ class TestGenerateBusinessData:
     def test_generate_categories(self):
         """Test generation with specific categories."""
         entries = generate_business_data(n=100, seed=42, categories=["invoice"])
-        
+
         assert len(entries) == 100
         # All entries should be invoices
         assert all("invoice" in e.tags for e in entries)
@@ -94,7 +93,7 @@ class TestGenerateBusinessData:
             customer_count=50,
             product_count=50
         )
-        
+
         assert len(entries) == 100
         # Check that we have reasonable variety in customers
         customers = set()
@@ -103,7 +102,7 @@ class TestGenerateBusinessData:
                 # Extract customer from title
                 customer = entry.title.split()[1]
                 customers.add(customer)
-        
+
         # Should have at least some customers
         assert len(customers) > 0
         assert len(customers) <= 50  # Should not exceed customer_count
@@ -115,7 +114,7 @@ class TestGenerateAlpacaTrainingData:
     def test_generate_default(self):
         """Test default training data generation."""
         data = generate_alpaca_training_data(n=100, seed=42)
-        
+
         assert len(data) > 0
         assert all(isinstance(item, dict) for item in data)
         assert all("instruction" in item for item in data)
@@ -126,7 +125,7 @@ class TestGenerateAlpacaTrainingData:
         """Test that training data generation is reproducible."""
         data1 = generate_alpaca_training_data(n=50, seed=42)
         data2 = generate_alpaca_training_data(n=50, seed=42)
-        
+
         assert len(data1) == len(data2)
         for d1, d2 in zip(data1, data2):
             assert d1 == d2
@@ -135,15 +134,15 @@ class TestGenerateAlpacaTrainingData:
         """Test saving training data to file."""
         output_path = str(tmp_path / "test_data.jsonl")
         data = generate_alpaca_training_data(n=10, seed=42, output_path=output_path)
-        
+
         # Check file exists
         import os
         assert os.path.exists(output_path)
-        
+
         # Check file contents
         with open(output_path, "r") as f:
             lines = f.readlines()
-        
+
         assert len(lines) == len(data)
         for line, item in zip(lines, data):
             import json

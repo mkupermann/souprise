@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="Souprise platform support matrix">
+  <title>Souprise platform support</title>
+  <desc>Matrix of platforms against retrieval, generation backend, and fine-tuning support. Retrieval and CLI are identical everywhere; the generation backend is auto-detected.</desc>
+  <defs>
+    <style>
+      .title   { font: 700 20px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; }
+      .subtitle{ font: 400 12.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .colh    { font: 700 11.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #7E8FA8; letter-spacing: 1.2px; }
+      .rowh    { font: 600 12.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; }
+      .cell    { font: 500 11.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .cellhi  { font: 600 11.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #8FB8F2; }
+      .mono    { font: 400 10.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #64748B; }
+    </style>
+    <linearGradient id="matBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0D1524"/>
+      <stop offset="1" stop-color="#101B30"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="330" rx="12" fill="url(#matBg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="329" rx="12" fill="none" stroke="#24344E"/>
+
+  <text x="48" y="52" class="title">Platform support</text>
+  <text x="48" y="74" class="subtitle">Retrieval, data generators, CLI, and tests are pure Python + NumPy — identical everywhere. The backend is auto-detected.</text>
+
+  <!-- Column headers -->
+  <text x="320" y="112" class="colh">RETRIEVAL (CORE)</text>
+  <text x="560" y="112" class="colh">GENERATION BACKEND</text>
+  <text x="830" y="112" class="colh">FINE-TUNING (SOUP)</text>
+
+  <line x1="48" y1="124" x2="1152" y2="124" stroke="#24344E"/>
+
+  <!-- Row 1 -->
+  <rect x="48" y="132" width="1104" height="42" rx="8" fill="#111D33"/>
+  <text x="66" y="158" class="rowh">macOS — Apple Silicon</text>
+  <text x="320" y="158" class="cellhi">Built-in HDC</text>
+  <text x="560" y="158" class="cell">MLX</text>
+  <text x="700" y="158" class="mono">.[mlx]</text>
+  <text x="830" y="158" class="cell">soup-cli[mlx]</text>
+
+  <!-- Row 2 -->
+  <rect x="48" y="180" width="1104" height="42" rx="8" fill="#0F1A2E"/>
+  <text x="66" y="206" class="rowh">Linux — NVIDIA CUDA</text>
+  <text x="320" y="206" class="cellhi">Built-in HDC</text>
+  <text x="560" y="206" class="cell">PyTorch</text>
+  <text x="700" y="206" class="mono">.[torch]</text>
+  <text x="830" y="206" class="cell">soup-cli[train]</text>
+
+  <!-- Row 3 -->
+  <rect x="48" y="228" width="1104" height="42" rx="8" fill="#111D33"/>
+  <text x="66" y="254" class="rowh">Linux / Windows — CPU</text>
+  <text x="320" y="254" class="cellhi">Built-in HDC</text>
+  <text x="560" y="254" class="cell">PyTorch</text>
+  <text x="700" y="254" class="mono">.[torch]</text>
+  <text x="830" y="254" class="cell">soup-cli[train]</text>
+
+  <!-- Row 4 -->
+  <rect x="48" y="276" width="1104" height="42" rx="8" fill="#0F1A2E"/>
+  <text x="66" y="302" class="rowh">AMD ROCm</text>
+  <text x="320" y="302" class="cellhi">Built-in HDC</text>
+  <text x="560" y="302" class="cell">PyTorch ROCm build</text>
+  <text x="830" y="302" class="cell">soup-cli[train]</text>
+</svg>

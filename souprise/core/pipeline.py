@@ -12,10 +12,10 @@ License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
-from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, Union
 import logging
 import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +48,39 @@ class RAGResult:
     total_latency: float = 0.0  # seconds
 
 
+# Default base models per backend, used when no model_path is given.
+DEFAULT_MODELS = {
+    "mlx": "mlx-community/Phi-2-4bit",
+    "torch": "microsoft/phi-2",
+}
+
+
+def resolve_backend(backend: str = "auto") -> str:
+    """Resolve "auto" to the backend available on this machine.
+
+    Prefers MLX when installed (Apple Silicon), otherwise PyTorch
+    (CUDA, ROCm, or CPU). Explicit "mlx"/"torch" values pass through.
+    """
+    if backend != "auto":
+        if backend not in ("mlx", "torch"):
+            raise ValueError(
+                f"Unknown backend '{backend}'. Use 'auto', 'mlx', or 'torch'."
+            )
+        return backend
+    try:
+        import mlx.core  # noqa: F401
+        return "mlx"
+    except ImportError:
+        return "torch"
+
+
 @dataclass
 class RAGConfig:
     """Configuration for the RAG pipeline."""
     retrieval_k: int = 5  # Number of results to retrieve
     model_path: str = "./souprise_model"  # Path to fine-tuned model
-    backend: str = "mlx"  # "mlx" for Apple Silicon, "torch" for CUDA
+    backend: str = "auto"  # "auto", "mlx" (Apple Silicon), "torch" (CUDA/ROCm/CPU)
+    retriever: str = "auto"  # "auto", "simple" (built-in), or "juicehdc"
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
@@ -62,15 +89,15 @@ class RAGConfig:
 
 class BaseRetriever:
     """Abstract base class for retrieval systems."""
-    
+
     def index(self, entries: List[Dict[str, Any]]) -> None:
         """Index a list of entries for retrieval."""
         raise NotImplementedError
-    
+
     def search(self, query: str, k: int = 5) -> List[RetrievalResult]:
         """Search for top-k results matching the query."""
         raise NotImplementedError
-    
+
     def clear(self) -> None:
         """Clear the index."""
         raise NotImplementedError
@@ -78,11 +105,11 @@ class BaseRetriever:
 
 class BaseGenerator:
     """Abstract base class for LLM generators."""
-    
+
     def load(self, model_path: str) -> None:
         """Load a model from the given path."""
         raise NotImplementedError
-    
+
     def generate(self, prompt: str, **kwargs) -> GenerationResult:
         """Generate text from a prompt."""
         raise NotImplementedError
@@ -90,66 +117,66 @@ class BaseGenerator:
 
 class HDCRetriever(BaseRetriever):
     """HDC-based retriever using JuiceHDC.
-    
+
     This is a wrapper around the JuiceHDC library (cortex-hdc).
     Requires: pip install git+https://github.com/mkupermann/JuiceHDC.git
     """
-    
+
     def __init__(self):
         self._store = None
         self._engine = None
         self._initialized = False
-    
+
     def index(self, entries: List[Dict[str, Any]]) -> None:
         """Index entries using JuiceHDC.
-        
+
         Args:
             entries: List of dicts with 'id', 'text', and optionally 'metadata'.
         """
         try:
-            from cortex.store import KnowledgeStore
             from cortex.encoder import CortexEncoder
             from cortex.engine import HDCEngine
+            from cortex.store import KnowledgeStore
         except ImportError as e:
             raise ImportError(
                 "JuiceHDC not installed. Install with: "
                 "pip install git+https://github.com/mkupermann/JuiceHDC.git"
             ) from e
-        
+
         # Initialize store and encoder
         store = KnowledgeStore()
         encoder = CortexEncoder()
-        
+
         # Index each entry
         for entry in entries:
             entry_id = entry.get("id", str(hash(entry["text"])))
             store.add(entry_id, entry["text"], metadata=entry.get("metadata", {}))
-        
+
         # Initialize engine
         self._store = store
         self._engine = HDCEngine(store, encoder)
         self._initialized = True
         logger.info(f"Indexed {len(entries)} entries with HDC")
-    
+
     def search(self, query: str, k: int = 5) -> List[RetrievalResult]:
         """Search for top-k results.
-        
+
         Args:
             query: The search query.
             k: Number of results to return.
-        
+
         Returns:
             List of RetrievalResult objects.
         """
         if not self._initialized:
             raise RuntimeError("Retriever not initialized. Call index() first.")
-        
+
         start_time = time.time()
         results = self._engine.search(query, k=k)
         latency = time.time() - start_time
-        
+
         logger.debug(f"Retrieved {len(results)} results in {latency*1000:.2f}ms")
-        
+
         return [
             RetrievalResult(
                 title=result.entry_id,
@@ -159,7 +186,7 @@ class HDCRetriever(BaseRetriever):
             )
             for result in results
         ]
-    
+
     def clear(self) -> None:
         """Clear the index."""
         self._store = None
@@ -169,18 +196,18 @@ class HDCRetriever(BaseRetriever):
 
 class MLXGenerator(BaseGenerator):
     """LLM generator using MLX backend (Apple Silicon).
-    
+
     Requires: pip install "soup-cli[mlx]"
     """
-    
+
     def __init__(self):
         self._model = None
         self._tokenizer = None
         self._loaded = False
-    
+
     def load(self, model_path: str) -> None:
         """Load a model using MLX.
-        
+
         Args:
             model_path: Path to the model directory or HuggingFace ID.
         """
@@ -190,32 +217,32 @@ class MLXGenerator(BaseGenerator):
             raise ImportError(
                 "MLX not installed. Install with: pip install mlx mlx-lm"
             ) from e
-        
+
         self._model, self._tokenizer = load(model_path)
         self._loaded = True
         logger.info(f"Loaded MLX model from {model_path}")
-    
+
     def generate(self, prompt: str, **kwargs) -> GenerationResult:
         """Generate text from a prompt.
-        
+
         Args:
             prompt: The input prompt.
             **kwargs: Additional generation parameters (max_tokens, temperature, etc.)
-        
+
         Returns:
             GenerationResult with text and latency.
         """
         if not self._loaded:
             raise RuntimeError("Generator not loaded. Call load() first.")
-        
+
         from mlx_lm import generate
-        
+
         start_time = time.time()
-        
+
         # Set defaults
         max_tokens = kwargs.get("max_tokens", 256)
         temperature = kwargs.get("temperature", 0.7)
-        
+
         text = generate(
             self._model,
             self._tokenizer,
@@ -223,32 +250,33 @@ class MLXGenerator(BaseGenerator):
             max_tokens=max_tokens,
             temperature=temperature
         )
-        
+
         latency = time.time() - start_time
-        
-        logger.debug(f"Generated {len(text.split())} tokens in {latency*1000:.2f}ms")
-        
+        tokens_generated = len(self._tokenizer.encode(text))
+
+        logger.debug(f"Generated {tokens_generated} tokens in {latency*1000:.2f}ms")
+
         return GenerationResult(
             text=text,
             latency=latency,
-            tokens_generated=len(text.split())
+            tokens_generated=tokens_generated
         )
 
 
 class TorchGenerator(BaseGenerator):
     """LLM generator using PyTorch backend (CUDA/CPU).
-    
+
     Requires: pip install "soup-cli[train]"
     """
-    
+
     def __init__(self):
         self._model = None
         self._tokenizer = None
         self._loaded = False
-    
+
     def load(self, model_path: str) -> None:
         """Load a model using Transformers.
-        
+
         Args:
             model_path: Path to the model directory or HuggingFace ID.
         """
@@ -258,33 +286,32 @@ class TorchGenerator(BaseGenerator):
             raise ImportError(
                 "Transformers not installed. Install with: pip install transformers"
             ) from e
-        
+
         self._tokenizer = AutoTokenizer.from_pretrained(model_path)
         self._model = AutoModelForCausalLM.from_pretrained(model_path)
         self._loaded = True
         logger.info(f"Loaded PyTorch model from {model_path}")
-    
+
     def generate(self, prompt: str, **kwargs) -> GenerationResult:
         """Generate text from a prompt.
-        
+
         Args:
             prompt: The input prompt.
             **kwargs: Additional generation parameters.
-        
+
         Returns:
             GenerationResult with text and latency.
         """
         if not self._loaded:
             raise RuntimeError("Generator not loaded. Call load() first.")
-        
-        import torch
-        
+
+
         start_time = time.time()
-        
+
         # Set defaults
         max_new_tokens = kwargs.get("max_tokens", 256)
         temperature = kwargs.get("temperature", 0.7)
-        
+
         inputs = self._tokenizer(prompt, return_tensors="pt")
         outputs = self._model.generate(
             **inputs,
@@ -293,32 +320,33 @@ class TorchGenerator(BaseGenerator):
             do_sample=True
         )
         text = self._tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
+
         latency = time.time() - start_time
-        
+        tokens_generated = outputs.shape[1] - inputs["input_ids"].shape[1]
+
         return GenerationResult(
             text=text,
             latency=latency,
-            tokens_generated=len(text.split())
+            tokens_generated=tokens_generated
         )
 
 
 class SoupriseRAG:
     """Main RAG pipeline combining retrieval and generation.
-    
+
     This is the core class for Souprise, providing a simple interface
     for RAG operations with HDC retrieval and LLM generation.
-    
+
     Example usage:
         rag = SoupriseRAG(config=RAGConfig(backend="mlx"))
         rag.index_from_entries(entries)
         result = rag.query("What are the open invoices?")
         print(result.answer)
     """
-    
+
     def __init__(self, config: Optional[RAGConfig] = None):
         """Initialize the RAG pipeline.
-        
+
         Args:
             config: Configuration for the pipeline. Uses defaults if None.
         """
@@ -326,42 +354,69 @@ class SoupriseRAG:
         self.retriever: Optional[BaseRetriever] = None
         self.generator: Optional[BaseGenerator] = None
         self._entries: List[Dict[str, Any]] = []
-    
+
     def _get_retriever(self) -> BaseRetriever:
-        """Get or create the retriever based on config."""
+        """Get or create the retriever based on config.
+
+        "simple" uses the built-in pure-NumPy HDC retriever, "juicehdc" the
+        optional JuiceHDC engine. "auto" prefers JuiceHDC when installed and
+        falls back to the built-in retriever otherwise.
+        """
         if self.retriever is None:
-            # Default to HDC retriever
-            self.retriever = HDCRetriever()
+            choice = self.config.retriever
+            if choice == "auto":
+                try:
+                    import cortex  # noqa: F401
+                    choice = "juicehdc"
+                except ImportError:
+                    choice = "simple"
+            if choice == "juicehdc":
+                self.retriever = HDCRetriever()
+            elif choice == "simple":
+                from souprise.core.hdc import SimpleHDCRetriever
+                self.retriever = SimpleHDCRetriever()
+            else:
+                raise ValueError(
+                    f"Unknown retriever '{self.config.retriever}'. "
+                    "Use 'auto', 'simple', or 'juicehdc', or set rag.retriever "
+                    "to any BaseRetriever implementation directly."
+                )
         return self.retriever
-    
+
     def _get_generator(self) -> BaseGenerator:
-        """Get or create the generator based on config."""
+        """Get or create the generator based on config.
+
+        "auto" resolves to MLX on Apple Silicon and PyTorch elsewhere.
+        Any BaseGenerator implementation can be assigned to self.generator
+        directly to bypass the built-in backends.
+        """
         if self.generator is None:
-            if self.config.backend == "mlx":
+            backend = resolve_backend(self.config.backend)
+            if backend == "mlx":
                 self.generator = MLXGenerator()
             else:
                 self.generator = TorchGenerator()
         return self.generator
-    
+
     def index_from_entries(self, entries: List[Dict[str, Any]]) -> None:
         """Index a list of entries for retrieval.
-        
+
         Args:
             entries: List of dicts with 'id', 'text', and optionally 'metadata'.
         """
         self._entries = entries
         retriever = self._get_retriever()
         retriever.index(entries)
-    
+
     def index_from_business_data(self, n: int = 10000, seed: int = 42) -> None:
         """Generate and index synthetic business data.
-        
+
         Args:
             n: Number of entries to generate.
             seed: Random seed for reproducibility.
         """
         from souprise.data.generators.business import generate_business_data
-        
+
         entries = generate_business_data(n=n, seed=seed)
         indexed_entries = [
             {
@@ -373,49 +428,49 @@ class SoupriseRAG:
         ]
         self.index_from_entries(indexed_entries)
         self._entries = indexed_entries
-    
+
     def load_model(self, model_path: Optional[str] = None) -> None:
         """Load the LLM model.
-        
+
         Args:
             model_path: Path to the model. Uses config.model_path if None.
         """
         path = model_path or self.config.model_path
         generator = self._get_generator()
         generator.load(path)
-    
+
     def query(self, question: str, k: Optional[int] = None) -> RAGResult:
         """Execute a RAG query: retrieval + generation.
-        
+
         Args:
             question: The user's question.
             k: Number of retrieval results. Uses config.retrieval_k if None.
-        
+
         Returns:
             RAGResult with answer, retrieval results, and latencies.
         """
         k = k or self.config.retrieval_k
         retriever = self._get_retriever()
         generator = self._get_generator()
-        
+
         # Measure retrieval latency
         retrieval_start = time.time()
         retrieval_results = retriever.search(question, k=k)
         retrieval_latency = time.time() - retrieval_start
-        
+
         # Build context
         context = "\n\n".join(
             f"--- {r.title} ---\n{r.content}"
             for r in retrieval_results
         )
-        
+
         # Build prompt
         prompt = f"""CONTEXT:
 {context}
 
 QUESTION: {question}
 ANSWER (based only on the context):"""
-        
+
         # Measure generation latency
         generation_start = time.time()
         gen_result = generator.generate(
@@ -424,9 +479,9 @@ ANSWER (based only on the context):"""
             temperature=self.config.temperature
         )
         generation_latency = time.time() - generation_start
-        
+
         total_latency = retrieval_latency + generation_latency
-        
+
         return RAGResult(
             question=question,
             answer=gen_result.text,
@@ -435,34 +490,34 @@ ANSWER (based only on the context):"""
             generation_latency=generation_latency,
             total_latency=total_latency
         )
-    
+
     def chat(self, messages: List[Dict[str, str]]) -> str:
         """Chat interface for multi-turn conversations.
-        
+
         Args:
             messages: List of message dicts with 'role' and 'content'.
                      Example: [{"role": "user", "content": "Hello"}]
-        
+
         Returns:
             Assistant's response.
         """
         if not messages:
             raise ValueError("Messages list cannot be empty")
-        
+
         # Get the latest user message
         user_message = None
         for msg in reversed(messages):
             if msg.get("role") == "user":
                 user_message = msg["content"]
                 break
-        
+
         if user_message is None:
             raise ValueError("No user message found")
-        
+
         # Execute RAG query
         result = self.query(user_message)
         return result.answer
-    
+
     def clear(self) -> None:
         """Clear the index and unload the model."""
         if self.retriever:
@@ -475,36 +530,40 @@ ANSWER (based only on the context):"""
 # Convenience function for quick use
 def quickstart(
     n_data: int = 10000,
-    model_path: str = "mlx-community/Phi-2-4bit",
-    backend: str = "mlx",
+    model_path: Optional[str] = None,
+    backend: str = "auto",
 ) -> SoupriseRAG:
     """Quickstart function to create a pre-configured RAG pipeline.
-    
-    Generates synthetic business data and loads a model.
-    
+
+    Generates synthetic business data and loads a model. The backend is
+    auto-detected (MLX on Apple Silicon, PyTorch on CUDA/ROCm/CPU) and a
+    suitable default base model is chosen for it unless model_path is given.
+
     Args:
         n_data: Number of synthetic data entries to generate.
-        model_path: Path or HuggingFace ID for the LLM.
-        backend: "mlx" for Apple Silicon, "torch" for CUDA.
-    
+        model_path: Path or HuggingFace ID for the LLM. Defaults to a
+            small base model matching the resolved backend.
+        backend: "auto", "mlx", or "torch".
+
     Returns:
         Configured SoupriseRAG instance ready for queries.
-    
+
     Example:
-        rag = quickstart(n_data=5000, model_path="mlx-community/Phi-2-4bit")
+        rag = quickstart(n_data=5000)
         result = rag.query("What are the open invoices?")
         print(result.answer)
     """
+    resolved = resolve_backend(backend)
     config = RAGConfig(
         retrieval_k=5,
-        model_path=model_path,
-        backend=backend,
+        model_path=model_path or DEFAULT_MODELS[resolved],
+        backend=resolved,
         max_tokens=256,
         temperature=0.7
     )
-    
+
     rag = SoupriseRAG(config=config)
     rag.index_from_business_data(n=n_data, seed=42)
     rag.load_model()
-    
+
     return rag

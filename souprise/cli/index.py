@@ -6,12 +6,12 @@ License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
-import typer
-from pathlib import Path
-from rich.console import Console
 import json
 
-from souprise.core.pipeline import SoupriseRAG, RAGConfig
+import typer
+from rich.console import Console
+
+from souprise.core.pipeline import SoupriseRAG
 from souprise.data.generators.business import generate_business_data
 
 app = typer.Typer(help="Manage the HDC index for business data.")
@@ -38,13 +38,13 @@ def create(
     ),
 ):
     """Create an HDC index from business data.
-    
+
     Example:
         souprise index create --data-path my_data.jsonl
         souprise index create --n 5000  # Generate synthetic data
     """
     rag = SoupriseRAG()
-    
+
     if data_path:
         # Load from file
         with open(data_path, "r") as f:
@@ -69,7 +69,7 @@ def create(
             for entry in entries
         ]
         console.print(f"[yellow]Generating {n} synthetic business entries...[/yellow]")
-    
+
     # Index data
     rag.index_from_entries(entries)
     console.print(f"[green]Indexed {len(entries)} entries[/green]")
@@ -82,23 +82,23 @@ def info(
     data_size: int = typer.Option(10000, help="Number of entries"),
 ):
     """Show information about the HDC index.
-    
+
     Example:
         souprise index info --data-size 10000
     """
     # Generate sample data to show stats
     entries = generate_business_data(n=data_size, seed=42)
-    
+
     # Count by category
     categories = {}
     for entry in entries:
         cat = entry.tags[0] if entry.tags else "unknown"
         categories[cat] = categories.get(cat, 0) + 1
-    
+
     console.print("[bold blue]HDC Index Statistics[/bold blue]")
     console.print(f"Total entries: {len(entries)}")
-    console.print(f"Vector dimension: 10,000 bits (HDC)")
-    console.print(f"Storage per entry: ~1.25 KB (packed)")
+    console.print("Vector dimension: 10,000 bits (HDC)")
+    console.print("Storage per entry: ~1.25 KB (packed)")
     console.print(f"Total storage: ~{len(entries) * 1.25 / 1024:.2f} MB")
     console.print()
     console.print("[bold]Entries by category:[/bold]")

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" role="img" aria-label="Souprise query lifecycle in six steps">
+  <title>Souprise query lifecycle</title>
+  <desc>Six steps: question, hypervector encoding, chunked XOR + popcount scan, top-k selection, context prompt, local LLM answer with latency instrumentation.</desc>
+  <defs>
+    <style>
+      .title   { font: 700 20px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; }
+      .subtitle{ font: 400 12.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .num     { font: 700 15px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #5CA8FF; }
+      .step    { font: 600 12.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; }
+      .stepsub { font: 400 10.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .mono    { font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #64748B; }
+      .lat     { font: 500 10.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #8FB8F2; }
+    </style>
+    <linearGradient id="flowBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0D1524"/>
+      <stop offset="1" stop-color="#101B30"/>
+    </linearGradient>
+    <marker id="farrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5CA8FF" fill-opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="330" rx="12" fill="url(#flowBg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="329" rx="12" fill="none" stroke="#24344E"/>
+
+  <text x="48" y="52" class="title">Query lifecycle</text>
+  <text x="48" y="74" class="subtitle">rag.query("Which invoices are overdue?") — every step local, every step timed.</text>
+
+  <!-- Row 1 -->
+  <rect x="48" y="100" width="342" height="84" rx="10" fill="#111D33" stroke="#24344E"/>
+  <text x="68" y="128" class="num">1</text>
+  <text x="88" y="128" class="step">Encode the question</text>
+  <text x="88" y="146" class="stepsub">Tokens + bigrams bundle into one 10,000-bit hypervector</text>
+  <text x="88" y="166" class="mono">BLAKE2b-seeded, deterministic across platforms</text>
+
+  <path d="M 390 142 L 424 142" fill="none" stroke="#5CA8FF" stroke-width="1.4" stroke-opacity="0.7" marker-end="url(#farrow)"/>
+
+  <rect x="429" y="100" width="342" height="84" rx="10" fill="#111D33" stroke="#24344E"/>
+  <text x="449" y="128" class="num">2</text>
+  <text x="469" y="128" class="step">Scan the packed index</text>
+  <text x="469" y="146" class="stepsub">Hamming distance via XOR + popcount, chunked so memory</text>
+  <text x="469" y="160" class="stepsub">stays bounded at any corpus size</text>
+  <text x="469" y="176" class="mono">exact search, 1,250 bytes/entry</text>
+
+  <path d="M 771 142 L 805 142" fill="none" stroke="#5CA8FF" stroke-width="1.4" stroke-opacity="0.7" marker-end="url(#farrow)"/>
+
+  <rect x="810" y="100" width="342" height="84" rx="10" fill="#111D33" stroke="#24344E"/>
+  <text x="830" y="128" class="num">3</text>
+  <text x="850" y="128" class="step">Select top-k records</text>
+  <text x="850" y="146" class="stepsub">argpartition — O(n) selection, no full sort</text>
+  <text x="850" y="166" class="mono">k = RAGConfig.retrieval_k</text>
+
+  <!-- Connector row 1 to row 2 -->
+  <path d="M 981 184 L 981 202 L 219 202 L 219 220" fill="none" stroke="#5CA8FF" stroke-width="1.4" stroke-opacity="0.5" marker-end="url(#farrow)"/>
+
+  <!-- Row 2 -->
+  <rect x="48" y="225" width="342" height="84" rx="10" fill="#111D33" stroke="#24344E"/>
+  <text x="68" y="253" class="num">4</text>
+  <text x="88" y="253" class="step">Build the context prompt</text>
+  <text x="88" y="271" class="stepsub">Top-k records and the question, answer grounded in context only</text>
+  <text x="88" y="291" class="lat">retrieval_latency recorded</text>
+
+  <path d="M 390 267 L 424 267" fill="none" stroke="#5CA8FF" stroke-width="1.4" stroke-opacity="0.7" marker-end="url(#farrow)"/>
+
+  <rect x="429" y="225" width="342" height="84" rx="10" fill="#111D33" stroke="#24344E"/>
+  <text x="449" y="253" class="num">5</text>
+  <text x="469" y="253" class="step">Generate locally</text>
+  <text x="469" y="271" class="stepsub">MLX or PyTorch, auto-detected — no network call</text>
+  <text x="469" y="291" class="lat">generation_latency recorded</text>
+
+  <path d="M 771 267 L 805 267" fill="none" stroke="#5CA8FF" stroke-width="1.4" stroke-opacity="0.7" marker-end="url(#farrow)"/>
+
+  <rect x="810" y="225" width="342" height="84" rx="10" fill="#13203A" stroke="#5CA8FF" stroke-opacity="0.8"/>
+  <text x="830" y="253" class="num">6</text>
+  <text x="850" y="253" class="step">RAGResult</text>
+  <text x="850" y="271" class="stepsub">answer · sources with scores · retrieval / generation / total latency</text>
+  <text x="850" y="291" class="lat">your hardware, your numbers</text>
+</svg>

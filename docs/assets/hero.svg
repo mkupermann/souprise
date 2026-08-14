@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Souprise — offline RAG for business data">
+  <title>Souprise — offline RAG for business data</title>
+  <desc>Six business record types converge into an HDC index, flow through a local LLM, and produce an answer — all inside one machine boundary.</desc>
+  <defs>
+    <style>
+      .lbl     { font: 500 11px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .word    { font: 700 44px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; letter-spacing: 0.5px; }
+      .tag     { font: 400 16px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+      .chip    { font: 600 11px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #8FB8F2; letter-spacing: 0.3px; }
+      .node    { font: 600 12px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #EAF1FA; }
+      .nodesub { font: 400 10.5px 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #9FB0C7; }
+    </style>
+    <linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0D1524"/>
+      <stop offset="1" stop-color="#101B30"/>
+    </linearGradient>
+    <linearGradient id="lineFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5CA8FF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#5CA8FF" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="300" rx="12" fill="url(#heroBg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="299" rx="12" fill="none" stroke="#24344E"/>
+
+  <!-- Six record-type lines converging into the HDC index node -->
+  <g fill="none" stroke="url(#lineFade)" stroke-width="1.6">
+    <path d="M 140 60  C 260 60,  320 140, 388 148"/>
+    <path d="M 140 96  C 260 96,  320 143, 388 149"/>
+    <path d="M 140 132 C 260 132, 320 147, 388 150"/>
+    <path d="M 140 168 C 260 168, 320 153, 388 151"/>
+    <path d="M 140 204 C 260 204, 320 157, 388 152"/>
+    <path d="M 140 240 C 260 240, 320 160, 388 153"/>
+  </g>
+
+  <!-- Record-type labels -->
+  <g class="lbl" text-anchor="end">
+    <text x="132" y="64">Invoices</text>
+    <text x="132" y="100">Orders</text>
+    <text x="132" y="136">Customers</text>
+    <text x="132" y="172">Products</text>
+    <text x="132" y="208">KPIs</text>
+    <text x="132" y="244">Budgets</text>
+  </g>
+
+  <!-- HDC index node -->
+  <circle cx="408" cy="150" r="17" fill="#0D1524" stroke="#5CA8FF" stroke-width="2"/>
+  <circle cx="408" cy="150" r="6" fill="#5CA8FF"/>
+  <text x="408" y="192" class="node" text-anchor="middle">HDC index</text>
+  <text x="408" y="207" class="nodesub" text-anchor="middle">1,250 bytes / entry</text>
+
+  <!-- Index to LLM -->
+  <path d="M 425 150 L 512 150" fill="none" stroke="#5CA8FF" stroke-width="1.6" stroke-opacity="0.7"/>
+
+  <!-- Local LLM node -->
+  <rect x="512" y="128" width="106" height="44" rx="8" fill="#0D1524" stroke="#5CA8FF" stroke-width="1.5"/>
+  <text x="565" y="147" class="node" text-anchor="middle">Local LLM</text>
+  <text x="565" y="162" class="nodesub" text-anchor="middle">MLX / PyTorch</text>
+
+  <!-- LLM to answer -->
+  <path d="M 618 150 L 680 150" fill="none" stroke="#5CA8FF" stroke-width="1.6" stroke-opacity="0.7"/>
+  <path d="M 674 145 L 682 150 L 674 155" fill="none" stroke="#5CA8FF" stroke-width="1.6" stroke-opacity="0.9"/>
+  <text x="694" y="154" class="node">Answer + sources + latencies</text>
+
+  <!-- Machine boundary -->
+  <rect x="60" y="30" width="900" height="240" rx="10" fill="none" stroke="#24344E" stroke-dasharray="5 5"/>
+  <text x="72" y="288" class="nodesub">One machine. Business data never crosses this line.</text>
+
+  <!-- Wordmark -->
+  <text x="1140" y="120" class="word" text-anchor="end">Souprise</text>
+  <text x="1140" y="150" class="tag" text-anchor="end">Offline RAG for business data</text>
+
+  <!-- Chips -->
+  <g>
+    <rect x="905" y="176" width="112" height="24" rx="12" fill="#13203A" stroke="#24344E"/>
+    <text x="961" y="192" class="chip" text-anchor="middle">no cloud at runtime</text>
+    <rect x="1025" y="176" width="115" height="24" rx="12" fill="#13203A" stroke="#24344E"/>
+    <text x="1082" y="192" class="chip" text-anchor="middle">Linux · macOS · Win</text>
+    <rect x="905" y="208" width="112" height="24" rx="12" fill="#13203A" stroke="#24344E"/>
+    <text x="961" y="224" class="chip" text-anchor="middle">XOR + popcount</text>
+    <rect x="1025" y="208" width="115" height="24" rx="12" fill="#13203A" stroke="#24344E"/>
+    <text x="1082" y="224" class="chip" text-anchor="middle">Apache-2.0</text>
+  </g>
+</svg>

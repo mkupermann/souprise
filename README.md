@@ -1,197 +1,151 @@
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="Souprise — offline RAG for business data" width="1000">
+</p>
+
 <div align="center">
 
-# 🍲 Souprise
-
-### Offline RAG for Business Data
-
-**Hyperdimensional Computing retrieval · Fine-tuned LLM generation · No cloud at runtime**
-
+[![CI](https://github.com/mkupermann/souprise/actions/workflows/ci.yml/badge.svg)](https://github.com/mkupermann/souprise/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Python 3.10–3.12](https://img.shields.io/badge/python-3.10--3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-4c6ef5.svg)](#platform-support)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#project-status)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-MLX-black.svg?logo=apple&logoColor=white)](https://github.com/ml-explore/mlx)
-
-*Ask questions about your invoices, orders, customers, and KPIs —*
-*queries run on your machine, and your data never leaves it.*
 
 </div>
+
+> Ask questions about your invoices, orders, customers, and KPIs. Retrieval and generation run on your own hardware; the default configuration with a local `model_path` operates entirely offline and never transmits business data.
 
 ---
 
 ## What is Souprise?
 
-Souprise is a **Retrieval-Augmented Generation (RAG) pipeline** built for business data that must stay on-premises. Instead of embedding vectors from a cloud API, it uses **Hyperdimensional Computing (HDC)**: every record is encoded as a 10,000-bit binary hypervector, and similarity search is a vectorized XOR + popcount — compact (**1,250 bytes of index per entry**, plus the record text itself), fast, and fully deterministic.
+Souprise is a Retrieval-Augmented Generation (RAG) pipeline for business data that must stay on-premises. It replaces the usual embedding-model-plus-vector-database stack with **Hyperdimensional Computing (HDC)**: no neural network runs at indexing or search time, results are fully deterministic, and the index costs exactly **1,250 bytes per entry**. Every record becomes a 10,000-bit binary hypervector; similarity search is a vectorized XOR + popcount over the packed index, implemented in this repository with NumPy alone and verified by the test suite.
 
-Retrieval feeds a **local LLM** — fine-tuned on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup) — running on the **MLX** backend (Apple Silicon) or **PyTorch** (CUDA/CPU).
+Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). Like Soup, Souprise is infrastructure-neutral: the generation backend is auto-detected — MLX on Apple Silicon, PyTorch on NVIDIA CUDA, AMD ROCm, or plain CPU — and the same code and commands work unchanged on Linux, macOS, and Windows.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│   Your laptop / server — no API keys, no cloud calls    │
-│                                                         │
-│   Business records ──► HDC index ──► Local LLM ──► 💬   │
-└─────────────────────────────────────────────────────────┘
-```
+**Network access, stated precisely.** The built-in retriever operates only on local data, with no network path in the code. The quickstart downloads a public base model once from Hugging Face (anonymous download; no API key or account required); with a local `model_path` there is no download and no connection at all, including air-gapped environments. Fine-tuning with Soup likewise runs on your own hardware. Business data is never transmitted anywhere at any time.
 
-> **Network honesty:** the quickstart examples pull a base model once from Hugging Face (e.g. `mlx-community/Phi-2-4bit`). After that — or if you point `model_path` at a local directory — Souprise runs fully offline, air-gap included. Your business data is never sent anywhere at any time.
+**Terminology in 30 seconds.**
 
-<details>
-<summary><b>Jargon in 30 seconds</b></summary>
-
-- **HDC (Hyperdimensional Computing)** — represents text as very long binary vectors (here: 10,000 bits); similar texts get similar bit patterns, so search is cheap bitwise math instead of neural network inference.
-- **Soup** — an open-source CLI for fine-tuning LLMs with LoRA on Apple Silicon (MLX) or CUDA.
-- **LoRA** — a fine-tuning method that trains small adapter matrices instead of the whole model; `r` and `alpha` control adapter size and strength.
+- **HDC (Hyperdimensional Computing)** — text represented as very long binary vectors (here: 10,000 bits); similar texts receive similar bit patterns, so search is inexpensive bitwise arithmetic instead of model inference.
+- **Soup** — an open-source CLI for fine-tuning LLMs with LoRA, on MLX or PyTorch.
+- **LoRA** — fine-tuning via small adapter matrices instead of the full model; `r` and `alpha` control adapter size and strength.
 - **Alpaca format** — a simple JSONL layout for training examples: `instruction`, `input`, `output`.
-- **MLX** — Apple's machine-learning framework for M-series chips.
+- **MLX** — Apple's machine-learning framework for M-series processors.
 
-</details>
+## Design Principles
 
-### Why HDC instead of dense embeddings?
+| Principle | Implementation |
+|---|---|
+| Data sovereignty | All indexing, retrieval, and generation run locally; no telemetry, no API keys at runtime |
+| Infrastructure-neutral | Linux, macOS, and Windows; backend auto-detection selects MLX or PyTorch per machine |
+| Verifiable claims | The HDC retriever ships in this repository; storage and search behavior are covered by tests, and every `RAGResult` reports its own latencies |
+| Lean core | Three dependencies (NumPy, Typer, Rich); backends and optional engines install via extras |
+| Pluggable architecture | `BaseRetriever` and `BaseGenerator` interfaces; any implementation can be injected |
 
-| | HDC hypervectors (Souprise) | Dense embedding models |
-|---|---|---|
-| **Encoding** | Deterministic binary vectors, no model inference | Requires an embedding model pass |
-| **Storage (vector only)** | 1,250 bytes / entry (10,000 bits) | 1.5–6 KB / entry (float32/16) |
-| **Similarity** | XOR + popcount (bitwise, SIMD-friendly) | Dot product / cosine (float math) |
-| **Dependencies** | NumPy + [JuiceHDC](https://github.com/mkupermann/JuiceHDC) | Embedding model + vector DB |
-| **Offline** | ✅ Always | ⚠️ Depends on the model/service |
+## Platform Support
 
----
+<p align="center">
+  <img src="docs/assets/platform_matrix.svg" alt="Platform support matrix" width="1000">
+</p>
+
+`RAGConfig(backend="auto")` — the default — resolves to MLX where available and PyTorch everywhere else, and picks a matching small base model unless one is specified. Any Hugging Face causal language model works as `model_path`: Mistral, Llama, Qwen, Phi, or your own fine-tuned checkpoint; the defaults are chosen only for small download size.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph DATA["📦 Data Layer"]
-        GEN["Synthetic Business<br/>Generators<br/><i>invoices · orders · CRM<br/>products · KPIs · budgets</i>"]
-        OWN["Your Own Entries<br/><i>id · text · metadata</i>"]
-    end
-
-    subgraph RETRIEVAL["🔍 HDC Retrieval — JuiceHDC"]
-        ENC["CortexEncoder<br/><i>text → 10,000-bit<br/>hypervector</i>"]
-        STORE["KnowledgeStore<br/><i>indexed entries</i>"]
-        ENGINE["HDCEngine<br/><i>XOR + popcount<br/>top-k search</i>"]
-    end
-
-    subgraph GENERATION["🤖 LLM Generation"]
-        MLX["MLXGenerator<br/><i>Apple Silicon</i>"]
-        TORCH["TorchGenerator<br/><i>CUDA / CPU</i>"]
-    end
-
-    subgraph PIPELINE["🍲 SoupriseRAG"]
-        Q["query()"]
-        CTX["Context Builder<br/><i>top-k records → prompt</i>"]
-        RES["RAGResult<br/><i>answer + latencies<br/>+ sources</i>"]
-    end
-
-    GEN --> STORE
-    OWN --> STORE
-    STORE --> ENGINE
-    ENC --> ENGINE
-    Q --> ENGINE
-    ENGINE -->|"top-k results"| CTX
-    CTX --> MLX
-    CTX --> TORCH
-    MLX --> RES
-    TORCH --> RES
-
-    style DATA fill:#1a3a5c,stroke:#4a90d9,color:#fff
-    style RETRIEVAL fill:#4a2c5c,stroke:#9b59b6,color:#fff
-    style GENERATION fill:#1e4d3a,stroke:#27ae60,color:#fff
-    style PIPELINE fill:#5c3a1a,stroke:#e67e22,color:#fff
-```
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Souprise architecture" width="1000">
+</p>
 
 ### Query lifecycle
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as User
-    participant R as SoupriseRAG
-    participant H as HDCRetriever
-    participant L as MLX / Torch Generator
+<p align="center">
+  <img src="docs/assets/query_flow.svg" alt="Query lifecycle" width="1000">
+</p>
 
-    U->>R: query("Which invoices are overdue?")
-    R->>H: search(question, k=5)
-    Note over H: encode query →<br/>XOR + popcount vs index
-    H-->>R: top-k records + scores
-    R->>R: build context prompt<br/>(records + question)
-    R->>L: generate(prompt)
-    Note over L: local model,<br/>max_tokens / temperature<br/>from RAGConfig
-    L-->>R: answer text
-    R-->>U: RAGResult<br/>(answer, sources, retrieval /<br/>generation / total latency)
+Performance figures are deliberately not published in this README. Every `RAGResult` carries `retrieval_latency`, `generation_latency`, and `total_latency`, and `benchmarks/retrieval_bench.py` measures index build time and query latency on your hardware — so the numbers you plan with are your own.
+
+## Retrieval at Scale
+
+The built-in retriever is designed to work well past 10,000 records:
+
+- **Exact, chunked search** — Hamming distances are computed in fixed-size chunks (default 65,536 rows), so peak memory stays around 80 MB during search regardless of corpus size, while results remain exact.
+- **O(n) top-k selection** — `argpartition` instead of a full sort.
+- **Hardware popcount** — uses `np.bitwise_count` on NumPy 2.x, with a lookup-table fallback on older versions.
+- **Incremental indexing** — `add(entries)` appends new records without re-encoding the existing index.
+- **Linear, predictable storage** — 1,250 bytes per entry: 100,000 records occupy 125 MB of index.
+
+```bash
+# Measure on your own machine — any corpus size
+python benchmarks/retrieval_bench.py --n 100000 --queries 50
 ```
 
-Every `RAGResult` carries its own instrumentation — `retrieval_latency`, `generation_latency`, `total_latency` — so you can measure performance on **your** hardware and data instead of trusting someone else's benchmark table.
+For corpora where an exact linear scan is no longer acceptable, the optional [JuiceHDC](https://github.com/mkupermann/JuiceHDC) engine can be swapped in (`pip install -e ".[juicehdc]"`, `RAGConfig(retriever="juicehdc")`), and an HD-NSW approximate index is on the roadmap for v1.0.
 
----
+| | `SimpleHDCRetriever` (default) | `HDCRetriever` (JuiceHDC) |
+|---|---|---|
+| Installation | None — included, NumPy only | `pip install -e ".[juicehdc]"` |
+| Encoding | Token bundling, deterministic BLAKE2b-seeded hypervectors | JuiceHDC `CortexEncoder` with typed tokens and character n-grams |
+| Search | Exact XOR + popcount, chunked, O(n) top-k | Managed by JuiceHDC |
+| Intended use | Default for any corpus; air-gapped installs | Advanced encoding, larger corpora |
 
-## Quick Start
+Any object implementing `BaseRetriever` (`index`, `search`, `clear`) can be assigned to `rag.retriever` directly; the same applies to `BaseGenerator` for custom inference backends.
 
-### 1 · Install
+## Installation
 
 ```bash
 git clone https://github.com/mkupermann/souprise.git
 cd souprise
 
-# Core + HDC retrieval + dev tools
-pip install -e ".[retrieval,dev]"
+pip install -e .                # core: retrieval, data generators, CLI
 ```
 
-<details>
-<summary><b>Platform-specific installs</b></summary>
+| Target | Command |
+|---|---|
+| Apple Silicon inference | `pip install -e ".[mlx]"` |
+| CUDA / ROCm / CPU inference | `pip install -e ".[torch]"` |
+| Fine-tuning with Soup | `pip install -e ".[finetune]"` plus `soup-cli[mlx]` (Apple Silicon) or `soup-cli[train]` (CUDA/CPU) |
+| JuiceHDC retrieval engine | `pip install -e ".[juicehdc]"` |
+| Development (tests, lint) | `pip install -e ".[dev]"` |
 
-```bash
-# Apple Silicon (M1–M4) — MLX backend
-pip install -e ".[retrieval]" mlx mlx-lm
+## Quick Start
 
-# CUDA GPUs — PyTorch backend
-pip install -e ".[retrieval]"
-pip install torch --index-url https://download.pytorch.org/whl/cu121
+The smallest possible start — retrieval only, no model, no download:
 
-# CPU only
-pip install -e "."
+```python
+from souprise import SimpleHDCRetriever
+
+retriever = SimpleHDCRetriever()
+retriever.index([
+    {"id": "INV-001", "text": "Invoice ACME Corp amount 12400 status overdue"},
+    {"id": "INV-002", "text": "Invoice Globex amount 800 status paid"},
+])
+print(retriever.search("overdue invoice ACME", k=1)[0].title)   # INV-001
 ```
 
-</details>
-
-### 2 · Three commands to a working RAG
-
-```bash
-# Generate 10,000 synthetic business Q&A pairs (Alpaca format)
-souprise train generate --output-path data/business_training.jsonl --n 10000
-
-# Fine-tune a small local model with Soup (config generated for you)
-souprise train create-config --model mlx-community/Phi-2-4bit --backend mlx
-soup train --config soup_config.yaml
-
-# Chat with your data
-souprise chat --model ./souprise_model --backend mlx
-```
-
-### 3 · Or use it as a library
+The full pipeline with a local LLM:
 
 ```python
 from souprise import quickstart
 
-# Indexes 10k synthetic business records + loads a local model
-rag = quickstart(n_data=10_000, model_path="mlx-community/Phi-2-4bit")
+# Indexes 10,000 synthetic business records and loads a local model.
+# Backend and default model are auto-detected for this machine.
+rag = quickstart(n_data=10_000)
 
 result = rag.query("What are the open invoices for Customer_0123?")
 
 print(result.answer)
-print(f"retrieval : {result.retrieval_latency*1000:6.2f} ms")
-print(f"generation: {result.generation_latency*1000:6.2f} ms")
-print(f"total     : {result.total_latency*1000:6.2f} ms")
+print(f"retrieval : {result.retrieval_latency * 1000:7.2f} ms")
+print(f"generation: {result.generation_latency * 1000:7.2f} ms")
+print(f"total     : {result.total_latency * 1000:7.2f} ms")
 ```
 
 Bring your own data with three fields per record:
 
 ```python
-from souprise import SoupriseRAG
-from souprise.core.pipeline import RAGConfig
+from souprise import SoupriseRAG, RAGConfig
 
-rag = SoupriseRAG(RAGConfig(backend="mlx", model_path="./souprise_model"))
+rag = SoupriseRAG(RAGConfig(retriever="simple", model_path="./souprise_model"))
 rag.index_from_entries([
     {"id": "INV-2025-001",
      "text": "Invoice ACME Corp\nAmount: $12,400\nStatus: overdue\nDue: 15 Mar 2025",
@@ -201,60 +155,41 @@ rag.index_from_entries([
 rag.load_model()
 ```
 
----
+### Command line
+
+```bash
+# Generate 10,000 synthetic business Q&A pairs (Alpaca format)
+souprise train generate --output-path data/business_training.jsonl --n 10000
+
+# Create a Soup fine-tuning configuration (backend auto-detected), then train
+souprise train create-config
+soup train --config soup_config.yaml
+
+# Chat with your data — same command on macOS, Linux, or Windows
+souprise chat --model ./souprise_model
+```
 
 ## Synthetic Business Data
 
-Souprise ships generators for six ERP/CRM entity types — seeded, reproducible, and containing **no real customer information**. Ideal for fine-tuning experiments and retrieval testing before you connect real data.
-
-```mermaid
-pie showData title Default category mix (10,000 entries, seed=42)
-    "Invoices" : 30
-    "Orders" : 25
-    "Customer Profiles" : 20
-    "Products" : 10
-    "KPIs" : 8
-    "Budgets" : 7
-```
+Souprise ships generators for six ERP/CRM entity types — seeded, reproducible, and containing no real customer information. They support fine-tuning experiments and retrieval testing before real data is connected.
 
 | Entity | Generated fields |
 |---|---|
-| 🧾 **Invoice** | customer, amount, status (paid/open/overdue/cancelled), region, department, due date |
-| 📦 **Order** | customer, product, quantity, unit price, total, fulfillment status |
-| 👤 **Customer** | annual revenue, segment (A/B/C/Enterprise), region, contact, open tickets |
-| 🏷️ **Product** | stock, price, margin, 30-day sales, trend |
-| 📈 **KPI** | department, metric, quarterly value vs. target, status |
-| 💰 **Budget** | department, allocated, spent, remaining, utilization |
+| Invoice | customer, amount, status (paid / open / overdue / cancelled), region, department, due date |
+| Order | customer, product, quantity, unit price, total, fulfillment status |
+| Customer | annual revenue, segment (A / B / C / Enterprise), region, contact, open tickets |
+| Product | stock, price, margin, 30-day sales, trend |
+| KPI | department, metric, quarterly value versus target, status |
+| Budget | department, allocated, spent, remaining, utilization |
 
-Each entry converts to three formats: retrieval (`to_retrieval_format`), plain dict, or **Alpaca** (`to_alpaca_format`) for Soup fine-tuning.
-
----
+Default category mix at `seed=42`: invoices 30 %, orders 25 %, customer profiles 20 %, products 10 %, KPIs 8 %, budgets 7 %. Each entry converts to three formats: retrieval (`to_retrieval_format`), plain dict (`to_dict`), or Alpaca (`to_alpaca_format`) for fine-tuning.
 
 ## Fine-Tuning Workflow
 
-```mermaid
-flowchart LR
-    A["souprise train generate<br/><i>synthetic Q&A pairs<br/>(Alpaca JSONL)</i>"]
-    B["souprise train create-config<br/><i>soup_config.yaml<br/>LoRA r=16 · 4-bit</i>"]
-    C["soup train<br/><i>fine-tune base model</i>"]
-    D["./souprise_model"]
-    E["souprise chat<br/><i>RAG over your data</i>"]
-
-    A --> C
-    B --> C
-    C --> D
-    D --> E
-
-    style A fill:#1a3a5c,stroke:#4a90d9,color:#fff
-    style B fill:#1a3a5c,stroke:#4a90d9,color:#fff
-    style C fill:#4a2c5c,stroke:#9b59b6,color:#fff
-    style D fill:#5c3a1a,stroke:#e67e22,color:#fff
-    style E fill:#1e4d3a,stroke:#27ae60,color:#fff
-```
-
-Default Soup config (generated by `create-config`): LoRA `r=16, alpha=32, dropout=0.05`, 4-bit quantization, 3 epochs, lr `2e-5`, 10 % validation split.
-
----
+1. `souprise train generate` — synthetic Q&A pairs in Alpaca JSONL (or your own data in the same format).
+2. `souprise train create-config` — writes `soup_config.yaml`; defaults: LoRA `r=16, alpha=32, dropout=0.05`, 4-bit quantization, 3 epochs, learning rate `2e-5`, 10 % validation split.
+3. `soup train --config soup_config.yaml` — fine-tunes the base model locally, producing `./souprise_model`.
+4. `souprise chat --model ./souprise_model` — RAG over your data with the tuned model, fully offline.
 
 ## CLI Reference
 
@@ -263,8 +198,8 @@ Default Soup config (generated by `create-config`): LoRA `r=16, alpha=32, dropou
 | `souprise chat` | Interactive RAG chat session |
 | `souprise chat query "<question>"` | One-shot question |
 | `souprise train generate` | Generate Alpaca-format training data |
-| `souprise train create-config` | Write a Soup fine-tuning config |
-| `souprise train all` | Data + config in one step |
+| `souprise train create-config` | Write a Soup fine-tuning configuration |
+| `souprise train all` | Data and configuration in one step |
 | `souprise index` | Manage the HDC index |
 | `souprise info` | Show installed backends and versions |
 | `souprise version` | Show version |
@@ -272,70 +207,56 @@ Default Soup config (generated by `create-config`): LoRA `r=16, alpha=32, dropou
 ## Configuration
 
 ```python
-from souprise.core.pipeline import RAGConfig
+from souprise import RAGConfig
 
 config = RAGConfig(
-    retrieval_k=5,                          # top-k records fed into the prompt
-    model_path="mlx-community/Phi-2-4bit",  # local path or HF ID
-    backend="mlx",                          # "mlx" (Apple Silicon) | "torch" (CUDA/CPU)
+    retrieval_k=5,                  # top-k records fed into the prompt
+    model_path="./souprise_model",  # local path or Hugging Face ID (any causal LM)
+    backend="auto",                 # "auto" | "mlx" (Apple Silicon) | "torch" (CUDA/ROCm/CPU)
+    retriever="auto",               # "auto" | "simple" | "juicehdc"
     max_tokens=256,
     temperature=0.7,
 )
 ```
 
----
+## Testing
 
-## Project Status
+The test suite runs against the core install alone — no model downloads, no optional dependencies — and covers the pipeline end to end:
 
-**Alpha (v0.1.0).** The pipeline, CLI, and data generators work; the benchmark suite and persistence layer are in progress. Performance numbers are deliberately **not** published here — run `rag.query()` and read the latencies from `RAGResult` on your own hardware.
-
-| | Milestone | Highlights |
-|---|---|---|
-| ✅ | **v0.1** | HDC retrieval, MLX/Torch generation, CLI, synthetic data generators |
-| 🔜 | **v0.2** | Persistent HDC storage (SQLite), Postgres connector, REST API, multi-turn chat, standardized benchmark suite |
-| 🗓️ | **v0.3** | SAP & DATEV integration, Excel/CSV importers, auth & RBAC, multi-tenant |
-| 🎯 | **v1.0** | Production deployment options, observability, 1M+ entries, HD-NSW index |
-
----
-
-## Ecosystem
-
-Souprise is the integration layer between two sibling projects:
-
-```mermaid
-flowchart TD
-    S["🍲 <b>Souprise</b><br/><i>RAG pipeline + CLI + business data</i>"]
-    J["🧠 <b>JuiceHDC</b><br/><i>hyperdimensional retrieval engine</i>"]
-    SO["🥣 <b>Soup</b><br/><i>LLM fine-tuning toolkit</i>"]
-    M["🍏 <b>MLX</b> / 🔥 <b>PyTorch</b><br/><i>inference backends</i>"]
-
-    S -->|retrieval| J
-    S -->|fine-tuning| SO
-    S -->|generation| M
-
-    style S fill:#5c3a1a,stroke:#e67e22,color:#fff
-    style J fill:#4a2c5c,stroke:#9b59b6,color:#fff
-    style SO fill:#1a3a5c,stroke:#4a90d9,color:#fff
-    style M fill:#1e4d3a,stroke:#27ae60,color:#fff
-```
-
-- [JuiceHDC](https://github.com/mkupermann/JuiceHDC) — Apache-2.0 — HDC encoding, storage, and search
-- [Soup](https://github.com/MakazhanAlpamys/Soup) — Apache-2.0 — LoRA fine-tuning for MLX and PyTorch
-- [MLX](https://github.com/ml-explore/mlx) — Apache-2.0 — Apple Silicon ML framework
-
-## Development
+- `tests/test_hdc_retriever.py` — the documented storage claim (10,000 bits = 1,250 bytes per entry), deterministic encoding, retrieval relevance, a 25,000-record scale test, chunked-search equivalence, and incremental `add()`.
+- `tests/test_pipeline.py` — the complete query path (retrieval, context building, generation, latency instrumentation) with the built-in retriever and a stub generator, backend resolution, and custom-retriever injection.
+- `tests/test_data_generators.py` — reproducibility and format guarantees of the data generators.
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/          # run tests
-ruff check souprise/   # lint
+pytest tests/
+ruff check souprise/ tests/
 ```
 
-Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Continuous integration runs the suite on Python 3.10 through 3.13 across Linux, macOS, and Windows on every push and pull request.
 
-## License
+## Project Status
 
-Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for third-party attributions.
+Alpha (v0.1.0). The pipeline, CLI, built-in retriever, and data generators are implemented and tested; persistence and connectors are in progress.
+
+| Version | Scope |
+|---|---|
+| v0.1 (current) | Built-in HDC retrieval (tested to 25k+ records), auto-detected MLX/PyTorch generation, CLI, synthetic data generators, cross-platform CI, retrieval benchmark |
+| v0.2 | Persistent HDC storage (SQLite), Postgres connector, REST API, multi-turn chat, standardized benchmark suite |
+| v0.3 | SAP and DATEV integration, Excel/CSV importers, authentication and RBAC, multi-tenant |
+| v1.0 | Production deployment options, observability, HD-NSW approximate index for very large corpora |
+
+## Ecosystem
+
+Souprise integrates with, but does not require, two sibling projects:
+
+- [JuiceHDC](https://github.com/mkupermann/JuiceHDC) — Apache-2.0 — optional HDC retrieval engine (the built-in retriever covers the default path)
+- [Soup](https://github.com/MakazhanAlpamys/Soup) — Apache-2.0 — LoRA fine-tuning for MLX and PyTorch
+- [MLX](https://github.com/ml-explore/mlx) — Apache-2.0 — Apple Silicon ML framework
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). License: Apache-2.0 ([LICENSE](LICENSE), third-party attributions in [NOTICE](NOTICE)).
 
 ## Citation
 
@@ -348,10 +269,6 @@ Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for third-par
 }
 ```
 
----
+## Support
 
-<div align="center">
-
-**Questions?** [Issues](https://github.com/mkupermann/souprise/issues) · [Discussions](https://github.com/mkupermann/souprise/discussions) · michael@kupermann.com
-
-</div>
+[Issues](https://github.com/mkupermann/souprise/issues) · [Discussions](https://github.com/mkupermann/souprise/discussions) · michael@kupermann.com

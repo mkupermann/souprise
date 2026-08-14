@@ -25,14 +25,23 @@ Copyright 2026 Michael Kupermann
 
 __version__ = "0.1.0"
 
-from souprise.core.pipeline import SoupriseRAG, RAGConfig, RetrievalResult, GenerationResult, RAGResult, quickstart
+from souprise.core.hdc import SimpleHDCRetriever
+from souprise.core.pipeline import (
+    GenerationResult,
+    RAGConfig,
+    RAGResult,
+    RetrievalResult,
+    SoupriseRAG,
+    quickstart,
+)
 
 __all__ = [
     "__version__",
     "SoupriseRAG",
-    "RAGConfig", 
+    "RAGConfig",
     "RetrievalResult",
     "GenerationResult",
     "RAGResult",
+    "SimpleHDCRetriever",
     "quickstart",
 ]

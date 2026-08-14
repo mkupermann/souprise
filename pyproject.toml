@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Offline RAG for business data: HDC retrieval + LLM generation"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10"
 authors = [
     { name = "Michael Kupermann", email = "michael@kupermann.com" }
 ]
@@ -22,36 +22,43 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Office/Business",
     "Topic :: Text Processing :: Linguistic",
 ]
 
+# Core is intentionally lean: retrieval (built-in HDC), data generators,
+# and the CLI work with these three packages alone. Inference backends and
+# the optional JuiceHDC engine are installed via extras.
 dependencies = [
-    "soup-cli[mlx]>=0.73.1",
     "numpy>=1.26.0",
-    "fastapi>=0.104.0",
-    "uvicorn>=0.24.0",
     "typer>=0.9.0",
     "rich>=13.0.0",
-    "pydantic>=2.0.0",
-    "huggingface-hub>=0.16.0",
 ]
 
 [project.optional-dependencies]
-# For full HDC functionality (JuiceHDC)
-retrieval = [
+# Apple Silicon inference backend
+mlx = ["mlx>=0.10.0", "mlx-lm>=0.10.0"]
+# CUDA/CPU inference backend
+torch = ["torch>=2.0.0", "transformers>=4.40.0"]
+# Fine-tuning via Soup; add soup-cli[mlx] (Apple Silicon) or
+# soup-cli[train] (CUDA/CPU) for the matching training backend
+finetune = ["soup-cli>=0.73.1"]
+# Optional JuiceHDC retrieval engine (built-in retriever needs no extra install)
+juicehdc = [
     "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main",
 ]
-# For database connectors
+# Planned REST API mode (v0.2)
+api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "pydantic>=2.0.0"]
+# Planned database connectors (v0.2)
 postgres = ["psycopg2-binary>=2.9.9", "sqlalchemy>=2.0.0"]
-# For development
+# Development: tests and linting run against core only, no git dependencies
 dev = [
-    "souprise[retrieval,postgres]",
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
-    "pytest-cov>=4.0",
 ]
 
 [project.scripts]
@@ -69,6 +76,8 @@ packages = ["souprise"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 
 [tool.mypy]

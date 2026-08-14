@@ -8,10 +8,11 @@ License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
+import json
 from dataclasses import dataclass
 from typing import List, Optional
+
 import numpy as np
-import json
 
 
 @dataclass
@@ -25,7 +26,10 @@ class BusinessEntry:
         """Convert entry to dictionary."""
         return {"title": self.title, "content": self.content, "tags": self.tags}
 
-    def to_alpaca_format(self, instruction_template: str = "Summarize the following business record: {title}") -> dict:
+    def to_alpaca_format(
+        self,
+        instruction_template: str = "Summarize the following business record: {title}",
+    ) -> dict:
         """Convert entry to Alpaca format for Soup fine-tuning."""
         instruction = instruction_template.format(title=self.title)
         return {
@@ -51,17 +55,17 @@ def generate_business_data(
     product_count: int = 200,
 ) -> List[BusinessEntry]:
     """Generate synthetic business data (ERP/CRM/Controlling).
-    
+
     All data is synthetic and reproducible via the seed parameter.
     Designed for benchmarking retrieval and fine-tuning LLMs.
-    
+
     Args:
         n: Number of entries to generate.
         seed: Random seed for reproducibility.
         categories: List of categories to include. If None, uses default mix.
         customer_count: Number of unique synthetic customers.
         product_count: Number of unique synthetic products.
-    
+
     Returns:
         List of BusinessEntry objects.
     """
@@ -105,18 +109,18 @@ def _generate_entry(
     statuses: dict,
 ) -> Optional[BusinessEntry]:
     """Generate a single business entry based on category."""
-    
+
     if category == "invoice":
         customer = rng.choice(customers)
         amount = rng.uniform(500, 50000)
         status = rng.choice(statuses["invoice"])
-        month = rng.choice(["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+        month = rng.choice(["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
         year = rng.choice([2024, 2025])
         region = rng.choice(regions)
         dept = rng.choice(departments)
         due_date = f"{rng.randint(1, 28)} {month} {year}"
-        
+
         content = (
             f"Customer: {customer}\n"
             f"Amount: ${amount:,.2f}\n"
@@ -140,7 +144,7 @@ def _generate_entry(
         unit_price = rng.uniform(10, 500)
         total = quantity * unit_price
         status = rng.choice(statuses["order"])
-        
+
         content = (
             f"Customer: {customer}\n"
             f"Product: {product}\n"
@@ -165,7 +169,7 @@ def _generate_entry(
         open_tickets = rng.randint(0, 10)
         last_contact_day = rng.randint(1, 28)
         last_contact_month = rng.randint(1, 12)
-        
+
         content = (
             f"Customer: {customer}\n"
             f"Annual Revenue: ${revenue:,.2f}\n"
@@ -189,7 +193,7 @@ def _generate_entry(
         margin = rng.uniform(5, 45)
         sales_30d = rng.randint(10, 2000)
         trend = rng.choice(["rising", "stable", "declining"])
-        
+
         content = (
             f"Product: {product}\n"
             f"Stock: {stock} units\n"
@@ -213,7 +217,7 @@ def _generate_entry(
         value = rng.uniform(0, 100)
         target = rng.uniform(50, 150)
         status = "On Target" if value >= target * 0.9 else "Below Target"
-        
+
         content = (
             f"Department: {dept}\n"
             f"Metric: {metric_type}\n"
@@ -235,7 +239,7 @@ def _generate_entry(
         spent = rng.uniform(0, allocated * 1.2)
         remaining = max(0, allocated - spent)
         utilization = min(100, (spent / allocated) * 100) if allocated > 0 else 0
-        
+
         content = (
             f"Department: {dept}\n"
             f"Year: {year}\n"
@@ -260,20 +264,20 @@ def generate_alpaca_training_data(
     output_path: Optional[str] = None,
 ) -> List[dict]:
     """Generate training data in Alpaca format for Soup fine-tuning.
-    
+
     Creates question-answer pairs based on synthetic business data.
-    
+
     Args:
         n: Number of training examples to generate.
         seed: Random seed for reproducibility.
         output_path: If provided, saves to JSONL file.
-    
+
     Returns:
         List of training examples in Alpaca format.
     """
     # Generate business data
     entries = generate_business_data(n=n, seed=seed)
-    
+
     # Convert to Alpaca format
     training_data = []
     for entry in entries:
@@ -291,54 +295,56 @@ def generate_alpaca_training_data(
                 "input": "",
                 "output": f"Invoice for {customer}: " + ". ".join(entry.content.split("\n")[:3])
             })
-        
+
         elif "Customer Profile" in entry.title:
             customer = entry.title.split()[2]
             training_data.append({
                 "instruction": f"What is the annual revenue for {customer}?",
                 "input": "",
-                "output": f"{customer} has an annual revenue of " + 
-                    next((line.split(": ")[1] for line in entry.content.split("\n") 
+                "output": f"{customer} has an annual revenue of " +
+                    next((line.split(": ")[1] for line in entry.content.split("\n")
                          if line.startswith("Annual Revenue")), "N/A")
             })
-        
+
         elif "Product" in entry.title:
             product = entry.title.split()[1]
             training_data.append({
                 "instruction": f"What is the current stock for {product}?",
                 "input": "",
-                "output": f"{product} has " + 
-                    next((line.split(": ")[1] for line in entry.content.split("\n") 
+                "output": f"{product} has " +
+                    next((line.split(": ")[1] for line in entry.content.split("\n")
                          if line.startswith("Stock")), "N/A") + " in stock."
             })
-        
+
         elif "KPI" in entry.title:
             training_data.append({
                 "instruction": f"What is the {entry.title}?",
                 "input": "",
                 "output": entry.content
             })
-        
+
         elif "Budget" in entry.title:
             training_data.append({
                 "instruction": f"What is the budget utilization for {entry.title}?",
                 "input": "",
-                "output": f"The utilization for {entry.title.split()[1]} is " + 
-                    next((line.split(": ")[1] for line in entry.content.split("\n") 
+                "output": f"The utilization for {entry.title.split()[1]} is " +
+                    next((line.split(": ")[1] for line in entry.content.split("\n")
                          if line.startswith("Utilization")), "N/A")
             })
-    
+
     # Save to file if requested
     if output_path:
         with open(output_path, "w") as f:
             for item in training_data:
                 f.write(json.dumps(item) + "\n")
-    
+
     return training_data
 
 
 if __name__ == "__main__":
     # Example usage: Generate 1000 training examples
     print("Generating synthetic business data for Souprise...")
-    training_data = generate_alpaca_training_data(n=1000, seed=42, output_path="data/samples/business_1k.jsonl")
+    training_data = generate_alpaca_training_data(
+        n=1000, seed=42, output_path="data/samples/business_1k.jsonl"
+    )
     print(f"Generated {len(training_data)} training examples -> data/samples/business_1k.jsonl")
