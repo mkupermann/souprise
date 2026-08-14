@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "souprise"
 version = "0.1.0"
-description = "Offline RAG for business data: HDC retrieval + LLM generation"
+description = "Private business AI toolkit: synthetic data, LoRA fine-tuning workflow, HDC retrieval, offline RAG"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

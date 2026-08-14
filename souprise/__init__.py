@@ -1,7 +1,8 @@
-"""Souprise: Offline RAG for Business Data.
+"""Souprise: private business AI toolkit.
 
-Combines HDC (Hyperdimensional Computing) retrieval with LLM generation
-for fast, private, and synthetic data-powered business applications.
+Covers the full path from data to grounded answers, entirely on-premises:
+synthetic ERP/CRM data generation, a Soup/LoRA fine-tuning workflow,
+HDC (Hyperdimensional Computing) retrieval, and an offline RAG runtime.
 
 Main components:
 - souprise.core: RAG pipeline (retrieval + generation)

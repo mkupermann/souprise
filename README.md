@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="Souprise — offline RAG for business data" width="1000">
+  <img src="docs/assets/hero.svg" alt="Souprise — private business AI, end to end" width="1000">
 </p>
 
 <div align="center">
@@ -13,13 +13,20 @@
 
 </div>
 
-> Ask questions about your invoices, orders, customers, and KPIs. Retrieval and generation run on your own hardware; the default configuration with a local `model_path` operates entirely offline and never transmits business data.
+> Build your own business AI: generate training data, fine-tune a domain model, index your records, and ask questions about invoices, orders, customers, and KPIs. Everything runs on your own hardware; the default configuration with a local `model_path` operates entirely offline and never transmits business data.
 
 ---
 
 ## What is Souprise?
 
-Souprise is a Retrieval-Augmented Generation (RAG) pipeline for business data that must stay on-premises: it retrieves the records relevant to a question, and a language model on your own machine answers from those records. You get grounded answers over your ERP and CRM data without sending a byte of it to a cloud service.
+Souprise is a toolkit for building private business AI on-premises — retrieval-augmented generation (RAG) is its runtime path, but the toolkit covers the full route from raw data to grounded answers. Four components, each usable on its own:
+
+| Component | What it does | Standalone use |
+|---|---|---|
+| Synthetic data generators | Seeded, reproducible ERP/CRM records and Alpaca-format Q&A pairs | Fine-tuning experiments and retrieval benchmarks before real data is connected |
+| Fine-tuning workflow | Turns a base model into your domain model: data generation, Soup/LoRA configuration, training orchestration | Produce a business-tuned LLM for any downstream use |
+| HDC retrieval engine | Deterministic 10,000-bit hypervector search, NumPy only | A search library for your own applications — no LLM required |
+| RAG runtime + CLI | Retrieves relevant records and has your local model answer from them, fully instrumented | Grounded question answering over ERP/CRM data |
 
 Five terms are enough to read the rest of this README:
 
@@ -272,7 +279,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Co
 ```bibtex
 @misc{souprise2026,
   author = {Michael Kupermann},
-  title  = {Souprise: Offline RAG for Business Data},
+  title  = {Souprise: Private Business AI Toolkit},
   year   = {2026},
   url    = {https://github.com/mkupermann/souprise}
 }

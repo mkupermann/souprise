@@ -15,7 +15,7 @@ from .train import app as train_app
 
 app = typer.Typer(
     name="souprise",
-    help="Offline RAG for Business Data: HDC Retrieval + LLM Generation",
+    help="Private business AI toolkit: data generation, fine-tuning, HDC retrieval, offline RAG",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )

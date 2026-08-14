@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Souprise — offline RAG for business data">
-  <title>Souprise — offline RAG for business data</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Souprise — private business AI, end to end">
+  <title>Souprise — private business AI, end to end</title>
   <desc>Six business record types converge into an HDC index, flow through a local LLM, and produce an answer — all inside one machine boundary.</desc>
   <defs>
     <style>
@@ -75,7 +75,7 @@
 
   <!-- Wordmark -->
   <text x="1140" y="120" class="word" text-anchor="end" style="fill:url(#brandWord)">Souprise</text>
-  <text x="1140" y="150" class="tag" text-anchor="end">Offline RAG for business data</text>
+  <text x="1140" y="150" class="tag" text-anchor="end">Private business AI, end to end</text>
 
   <!-- Chips -->
   <g>
