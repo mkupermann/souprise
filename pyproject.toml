@@ -41,7 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 # For full HDC functionality (JuiceHDC)
 retrieval = [
-    "git+https://github.com/mkupermann/JuiceHDC.git@main#egg=cortex-hdc",
+    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main",
 ]
 # For database connectors
 postgres = ["psycopg2-binary>=2.9.9", "sqlalchemy>=2.0.0"]

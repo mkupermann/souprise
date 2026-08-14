@@ -61,5 +61,8 @@ Thumbs.db
 # Souprise specific
 souprise_model/
 souprise_index/
-data/
+/data/
 output/
+
+# Claude Code session context (contains personal data — never commit)
+.claude/
