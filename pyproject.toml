@@ -73,6 +73,10 @@ Issues = "https://github.com/mkupermann/souprise/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["souprise"]
 
+[tool.hatch.metadata]
+# The juicehdc extra points at a git repository (JuiceHDC has no PyPI release)
+allow-direct-references = true
+
 [tool.ruff]
 target-version = "py310"
 line-length = 100
