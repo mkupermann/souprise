@@ -243,13 +243,25 @@ class MLXGenerator(BaseGenerator):
         max_tokens = kwargs.get("max_tokens", 256)
         temperature = kwargs.get("temperature", 0.7)
 
-        text = generate(
-            self._model,
-            self._tokenizer,
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
+        try:
+            # mlx-lm >= 0.20: sampling parameters go through a sampler object
+            from mlx_lm.sample_utils import make_sampler
+            text = generate(
+                self._model,
+                self._tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                sampler=make_sampler(temp=temperature)
+            )
+        except ImportError:
+            # older mlx-lm accepted temperature directly
+            text = generate(
+                self._model,
+                self._tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
 
         latency = time.time() - start_time
         tokens_generated = len(self._tokenizer.encode(text))

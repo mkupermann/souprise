@@ -57,8 +57,8 @@ def info():
         table.add_row("NumPy", "[red]Not installed[/red]")
 
     try:
-        import mlx
-        table.add_row("MLX", f"{mlx.__version__}")
+        import mlx.core
+        table.add_row("MLX", f"{mlx.core.__version__}")
     except ImportError:
         table.add_row("MLX", "[yellow]Not installed (Apple Silicon only)[/yellow]")
 

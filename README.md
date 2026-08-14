@@ -13,44 +13,49 @@
 
 </div>
 
-> Build your own business AI: generate training data, fine-tune a domain model, index your records, and ask questions about invoices, orders, customers, and KPIs. Everything runs on your own hardware; the default configuration with a local `model_path` operates entirely offline and never transmits business data.
+> Generate training data, fine-tune a domain model, index your records, then ask questions about invoices, orders, customers and KPIs. It all runs on your hardware. Point `model_path` at a local folder and nothing ever touches the network.
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="souprise demo, recorded live. System info, training data generation, Soup config, a 10,000-record retrieval benchmark, and a grounded answer from a local model." width="1000"><br>
+  <sub>Recorded live on an Apple M-series laptop, 62 seconds, nothing cut. 10,000 records indexed in 8 s, 3.8 ms median query, grounded answer from a local Qwen 0.5B in 1.4 s. Those are one machine's numbers, not a promise. Run <code>benchmarks/retrieval_bench.py</code> and get your own.</sub>
+</p>
 
 ---
 
 ## What is Souprise?
 
-Souprise is a toolkit for building private business AI on-premises — retrieval-augmented generation (RAG) is its runtime path, but the toolkit covers the full route from raw data to grounded answers. Four components, each usable on its own:
+Souprise is a toolkit for building business AI that stays in the building. Retrieval-augmented generation is the runtime path, but the repo covers the whole route from raw data to grounded answers. Four parts, each useful on its own.
 
 | Component | What it does | Standalone use |
 |---|---|---|
 | Synthetic data generators | Seeded, reproducible ERP/CRM records and Alpaca-format Q&A pairs | Fine-tuning experiments and retrieval benchmarks before real data is connected |
-| Fine-tuning workflow | Turns a base model into your domain model: data generation, Soup/LoRA configuration, training orchestration | Produce a business-tuned LLM for any downstream use |
-| HDC retrieval engine | Deterministic 10,000-bit hypervector search, NumPy only | A search library for your own applications — no LLM required |
-| RAG runtime + CLI | Retrieves relevant records and has your local model answer from them, fully instrumented | Grounded question answering over ERP/CRM data |
+| Fine-tuning workflow | Turns a base model into your domain model. Data generation, Soup/LoRA configuration, training orchestration | Produce a business-tuned LLM for any downstream use |
+| HDC retrieval engine | Deterministic 10,000-bit hypervector search, NumPy only | A search library for your own applications, no LLM required |
+| RAG runtime + CLI | Retrieves relevant records and has your local model answer from them, fully instrumented | Grounded question answering over ERP and CRM data |
 
-Five terms are enough to read the rest of this README:
+You need five terms for the rest of this page.
 
-- **HDC (Hyperdimensional Computing)** — text represented as very long binary vectors (here: 10,000 bits); similar texts receive similar bit patterns, so search is inexpensive bitwise arithmetic instead of model inference.
-- **MLX** — Apple's machine-learning framework for M-series processors; PyTorch covers every other machine.
-- **Soup** — an open-source CLI for fine-tuning LLMs with LoRA, on MLX or PyTorch.
-- **LoRA** — fine-tuning via small adapter matrices instead of the full model; `r` and `alpha` control adapter size and strength.
-- **Alpaca format** — a simple JSONL layout for training examples: `instruction`, `input`, `output`.
+- **HDC (Hyperdimensional Computing).** Text becomes a very long binary vector, 10,000 bits here. Similar texts get similar bit patterns, so search is cheap bitwise math instead of model inference.
+- **MLX.** Apple's ML framework for M-series chips. PyTorch covers every other machine.
+- **Soup.** An open-source CLI that fine-tunes LLMs with LoRA, on MLX or PyTorch.
+- **LoRA.** Fine-tuning through small adapter matrices instead of the whole model. `r` and `alpha` set adapter size and strength.
+- **Alpaca format.** A plain JSONL layout for training examples with `instruction`, `input` and `output` fields.
 
-Souprise replaces the usual embedding-model-plus-vector-database stack with HDC: no neural network runs at indexing or search time, results are fully deterministic, and the index occupies exactly **1,250 bytes per entry**. Every record becomes a 10,000-bit binary hypervector; similarity search is a vectorized XOR + popcount over the packed index, implemented in this repository with NumPy alone and verified by the test suite.
+Most RAG stacks run an embedding model plus a vector database. Souprise skips both. No neural network runs at indexing or search time, results are deterministic, and the index occupies exactly **1,250 bytes per entry**. Every record becomes a 10,000-bit hypervector. Search is a vectorized XOR plus popcount over the packed index, written in plain NumPy in this repository and pinned down by the test suite.
 
-Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). Like Soup, Souprise is infrastructure-neutral: the generation backend is auto-detected — MLX on Apple Silicon, PyTorch on NVIDIA CUDA, AMD ROCm, or plain CPU — and the same code and commands work unchanged on Linux, macOS, and Windows.
+The retrieved records go to a local LLM, which you can fine-tune on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). And like Soup, Souprise doesn't care what machine you own. It detects MLX on Apple Silicon and falls back to PyTorch on NVIDIA CUDA, AMD ROCm or plain CPU. Same code, same commands, on Linux, macOS and Windows.
 
-**What touches the network, exactly.** The built-in retriever operates only on local data; there is no network path in its code. `quickstart()` downloads a public base model once from Hugging Face on first run (public models download without an API key); pass a local `model_path` instead and there is no download and no connection at all, including air-gapped environments. Fine-tuning with Soup likewise runs on your own hardware. Business data is never transmitted anywhere at any time. These guarantees cover the built-in components — if you inject a custom `BaseRetriever` or `BaseGenerator`, its network behavior is yours to vouch for.
+**What touches the network, exactly.** The built-in retriever has no network path, full stop. `quickstart()` pulls a public base model from Hugging Face once, no API key needed. Point `model_path` at a local folder instead and there's no download and no connection at all, air gap included. Fine-tuning with Soup runs on your hardware too. Your business data is never sent anywhere, at any time. One caveat, and it's yours to own. If you inject a custom `BaseRetriever` or `BaseGenerator`, nobody can vouch for its network behavior but you.
 
 ## Design Principles
 
 | Principle | Implementation |
 |---|---|
-| Data sovereignty | All indexing, retrieval, and generation run locally; no telemetry, no API keys at runtime |
-| Infrastructure-neutral | Linux, macOS, and Windows; backend auto-detection selects MLX or PyTorch per machine |
-| Verifiable claims | The HDC retriever ships in this repository; storage and search behavior are covered by tests, and every `RAGResult` reports its own latencies |
-| Lean core | Three dependencies (NumPy, Typer, Rich); backends and optional engines install via extras |
-| Pluggable architecture | `BaseRetriever` and `BaseGenerator` interfaces; any implementation can be injected |
+| Data sovereignty | Indexing, retrieval and generation run locally. No telemetry, no API keys at runtime |
+| Infrastructure-neutral | Linux, macOS and Windows. Backend auto-detection picks MLX or PyTorch per machine |
+| Verifiable claims | The HDC retriever ships in this repository, its storage and search behavior are covered by tests, and every `RAGResult` reports its own latencies |
+| Lean core | Three dependencies (NumPy, Typer, Rich). Backends and optional engines install via extras |
+| Pluggable architecture | `BaseRetriever` and `BaseGenerator` interfaces. Any implementation can be injected |
 
 ## Platform Support
 
@@ -58,7 +63,7 @@ Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup
   <img src="docs/assets/platform_matrix.svg" alt="Platform support matrix" width="1000">
 </p>
 
-`RAGConfig(backend="auto")` — the default — resolves to MLX where available and PyTorch everywhere else, and picks a matching small base model unless one is specified. Any Hugging Face causal language model works as `model_path`: Mistral, Llama, Qwen, Phi, or your own fine-tuned checkpoint; the defaults are chosen only for small download size.
+`backend="auto"` is the default and does what you'd expect. MLX where it exists, PyTorch everywhere else, plus a matching small base model unless you name one. Any Hugging Face causal LM works as `model_path`. Mistral, Llama, Qwen, Phi, or your own fine-tuned checkpoint. The shipped defaults were picked for download size, nothing else.
 
 ## Architecture
 
@@ -72,33 +77,33 @@ Retrieval feeds a **local LLM**, optionally fine-tuned on your domain with [Soup
   <img src="docs/assets/query_flow.svg" alt="Query lifecycle" width="1000">
 </p>
 
-Performance figures are deliberately not published in this README. Every `RAGResult` carries `retrieval_latency`, `generation_latency`, and `total_latency`, and `benchmarks/retrieval_bench.py` measures index build time and query latency on your hardware — so the numbers you plan with are your own.
+You won't find performance claims in this README, and that's on purpose. Every `RAGResult` carries its own retrieval, generation and total latency, and `benchmarks/retrieval_bench.py` measures index build and query time where it counts, on your machine. Plan with your numbers, not ours.
 
 ## Retrieval at Scale
 
-The built-in retriever is designed to work well past 10,000 records:
+The built-in retriever doesn't stop at 10,000 records.
 
-- **Exact, chunked search** — Hamming distances are computed in fixed-size chunks, so the temporary buffers are bounded by `chunk_rows` × 1,250 bytes (about 80 MB at the default of 65,536 rows) regardless of corpus size, while results remain exact. Chunked and unchunked search are verified equivalent by the test suite.
-- **O(n) top-k selection** — `argpartition` instead of a full sort.
-- **Hardware popcount** — uses `np.bitwise_count` on NumPy 2.x, with a lookup-table fallback on older versions.
-- **Incremental indexing** — `add(entries)` appends new records without re-encoding the existing index.
-- **Linear, predictable storage** — 1,250 bytes per entry: 100,000 records occupy 125 MB of index.
+- **Exact, chunked search.** Hamming distances are computed in fixed-size blocks, so temporary memory stays near 80 MB at the default `chunk_rows` of 65,536, no matter how big the corpus gets. The tests prove chunked and unchunked search return identical results.
+- **Top-k by argpartition.** O(n) selection, no full sort.
+- **Hardware popcount** on NumPy 2.x, lookup-table fallback on older versions.
+- **Incremental indexing.** `add(entries)` appends new records without re-encoding what's already there.
+- **Linear storage.** 1,250 bytes per entry, so 100,000 records need 125 MB of index.
 
 ```bash
-# Measure on your own machine — any corpus size
+# Measure on your own machine, any corpus size
 python benchmarks/retrieval_bench.py --n 100000 --queries 50
 ```
 
-For corpora where an exact linear scan is no longer acceptable, the optional [JuiceHDC](https://github.com/mkupermann/JuiceHDC) engine can be swapped in (`pip install -e ".[juicehdc]"`, `RAGConfig(retriever="juicehdc")`), and an HD-NSW approximate index is on the roadmap for v1.0.
+When an exact linear scan stops being fast enough for you, swap in the optional [JuiceHDC](https://github.com/mkupermann/JuiceHDC) engine with `pip install -e ".[juicehdc]"` and `RAGConfig(retriever="juicehdc")`. An HD-NSW approximate index is planned for v1.0.
 
 | | `SimpleHDCRetriever` (default) | `HDCRetriever` (JuiceHDC) |
 |---|---|---|
-| Installation | None — included, NumPy only | `pip install -e ".[juicehdc]"` |
+| Installation | None. Included, NumPy only | `pip install -e ".[juicehdc]"` |
 | Encoding | Token bundling, deterministic BLAKE2b-seeded hypervectors | JuiceHDC `CortexEncoder` with typed tokens and character n-grams |
 | Search | Exact XOR + popcount, chunked, O(n) top-k | Managed by JuiceHDC |
-| Intended use | Default for any corpus; air-gapped installs | Advanced encoding, larger corpora |
+| Intended use | Default for any corpus, air-gapped installs | Advanced encoding, larger corpora |
 
-Any object implementing `BaseRetriever` (`index`, `search`, `clear`) can be assigned to `rag.retriever` directly; the same applies to `BaseGenerator` for custom inference backends.
+Anything that implements `BaseRetriever` (`index`, `search`, `clear`) can be assigned to `rag.retriever` directly. Same for `BaseGenerator` and custom inference backends.
 
 ## Installation
 
@@ -119,7 +124,7 @@ pip install -e .                # core: retrieval, data generators, CLI
 
 ## Quick Start
 
-The smallest possible start — retrieval only, no model, no download:
+The smallest possible start. Retrieval only, no model, no download.
 
 ```python
 from souprise import SimpleHDCRetriever
@@ -132,14 +137,14 @@ retriever.index([
 print(retriever.search("overdue invoice ACME", k=1)[0].title)   # INV-001
 ```
 
-The full pipeline with a local LLM:
+The full pipeline with a local LLM.
 
 ```python
 from souprise import quickstart
 
 # Indexes 10,000 synthetic business records and loads a model.
-# Backend and default model are auto-detected for this machine; the base
-# model is downloaded once from Hugging Face on first run — pass
+# Backend and default model are auto-detected for this machine. The base
+# model is downloaded once from Hugging Face on first run. Pass
 # model_path="./your_local_model" for a fully offline start.
 rag = quickstart(n_data=10_000)
 
@@ -151,7 +156,7 @@ print(f"generation: {result.generation_latency * 1000:7.2f} ms")
 print(f"total     : {result.total_latency * 1000:7.2f} ms")
 ```
 
-Bring your own data with three fields per record:
+Bring your own data. Three fields per record.
 
 ```python
 from souprise import SoupriseRAG, RAGConfig
@@ -176,13 +181,13 @@ souprise train generate --output-path data/business_training.jsonl --n 10000
 souprise train create-config
 soup train --config soup_config.yaml
 
-# Chat with your data — same command on macOS, Linux, or Windows
+# Chat with your data. Same command on macOS, Linux or Windows
 souprise chat --model ./souprise_model
 ```
 
 ## Synthetic Business Data
 
-Souprise ships generators for six ERP/CRM entity types — seeded, reproducible, and containing no real customer information. They support fine-tuning experiments and retrieval testing before real data is connected.
+Six ERP/CRM entity types ship as generators. Seeded, reproducible, and containing no real customer information. Use them to test fine-tuning and retrieval before any real data gets involved.
 
 | Entity | Generated fields |
 |---|---|
@@ -193,14 +198,14 @@ Souprise ships generators for six ERP/CRM entity types — seeded, reproducible,
 | KPI | department, metric, quarterly value versus target, status |
 | Budget | department, allocated, spent, remaining, utilization |
 
-Default category mix at `seed=42`: invoices 30 %, orders 25 %, customer profiles 20 %, products 10 %, KPIs 8 %, budgets 7 %. Each entry converts to three formats: retrieval (`to_retrieval_format`), plain dict (`to_dict`), or Alpaca (`to_alpaca_format`) for fine-tuning.
+The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profiles, 10 % products, 8 % KPIs and 7 % budgets. Each entry converts to three formats. Retrieval (`to_retrieval_format`), plain dict (`to_dict`), or Alpaca (`to_alpaca_format`) for fine-tuning.
 
 ## Fine-Tuning Workflow
 
-1. `souprise train generate` — synthetic Q&A pairs in Alpaca JSONL (or your own data in the same format).
-2. `souprise train create-config` — writes `soup_config.yaml`; defaults: LoRA `r=16, alpha=32, dropout=0.05`, 4-bit quantization, 3 epochs, learning rate `2e-5`, 10 % validation split.
-3. `soup train --config soup_config.yaml` — fine-tunes the base model locally, producing `./souprise_model`.
-4. `souprise chat --model ./souprise_model` — RAG over your data with the tuned model, fully offline.
+1. `souprise train generate` writes synthetic Q&A pairs as Alpaca JSONL. Your own data works in the same format.
+2. `souprise train create-config` writes `soup_config.yaml`. Defaults are LoRA `r=16, alpha=32, dropout=0.05`, 4-bit quantization, 3 epochs, learning rate `2e-5`, 10 % validation split.
+3. `soup train --config soup_config.yaml` fine-tunes the base model locally and produces `./souprise_model`.
+4. `souprise chat --model ./souprise_model` runs RAG over your data with the tuned model, fully offline.
 
 ## CLI Reference
 
@@ -233,15 +238,13 @@ config = RAGConfig(
 )
 ```
 
-The out-of-the-box defaults are chosen purely for download size, not vendor preference — override `model_path` with any vendor's model, local or from the Hub.
-
 ## Testing
 
-The test suite runs against the core install alone — no model downloads, no optional dependencies — and covers the pipeline end to end:
+The suite runs against the core install alone. No model downloads, no optional extras. It still covers the pipeline end to end.
 
-- `tests/test_hdc_retriever.py` — the documented storage claim (10,000 bits = 1,250 bytes per entry), deterministic encoding, retrieval relevance, a 25,000-record scale test, chunked-search equivalence, and incremental `add()`.
-- `tests/test_pipeline.py` — the complete query path (retrieval, context building, generation, latency instrumentation) with the built-in retriever and a stub generator, backend resolution, and custom-retriever injection.
-- `tests/test_data_generators.py` — reproducibility and format guarantees of the data generators.
+- `tests/test_hdc_retriever.py` checks the storage claim (10,000 bits are 1,250 bytes per entry), deterministic encoding, retrieval relevance, a 25,000-record scale test, chunked-search equivalence and incremental `add()`.
+- `tests/test_pipeline.py` runs the whole query path with the built-in retriever and a stub generator, plus backend resolution and custom-retriever injection.
+- `tests/test_data_generators.py` covers reproducibility and format guarantees.
 
 ```bash
 pip install -e ".[dev]"
@@ -249,11 +252,11 @@ pytest tests/
 ruff check souprise/ tests/
 ```
 
-Continuous integration runs the suite on Python 3.10 through 3.13 across Linux, macOS, and Windows on every push and pull request.
+CI runs the suite on Python 3.10 through 3.13 across Linux, macOS and Windows, on every push and pull request.
 
 ## Project Status
 
-Alpha (v0.1.0). The pipeline, CLI, built-in retriever, and data generators are implemented and tested; persistence and connectors are in progress.
+Alpha, v0.1.0. Pipeline, CLI, built-in retriever and data generators are built and tested. Persistence and connectors come next.
 
 | Version | Scope |
 |---|---|
@@ -264,15 +267,15 @@ Alpha (v0.1.0). The pipeline, CLI, built-in retriever, and data generators are i
 
 ## Ecosystem
 
-Souprise integrates with, but does not require, two sibling projects:
+Souprise plays well with two sibling projects but needs neither.
 
-- [JuiceHDC](https://github.com/mkupermann/JuiceHDC) — Apache-2.0 — optional HDC retrieval engine (the built-in retriever covers the default path)
-- [Soup](https://github.com/MakazhanAlpamys/Soup) — Apache-2.0 — LoRA fine-tuning for MLX and PyTorch
-- [MLX](https://github.com/ml-explore/mlx) — Apache-2.0 — Apple Silicon ML framework
+- [JuiceHDC](https://github.com/mkupermann/JuiceHDC), Apache-2.0. Optional HDC retrieval engine. The built-in retriever covers the default path.
+- [Soup](https://github.com/MakazhanAlpamys/Soup), Apache-2.0. LoRA fine-tuning for MLX and PyTorch.
+- [MLX](https://github.com/ml-explore/mlx), Apache-2.0. Apple Silicon ML framework.
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). License: Apache-2.0 ([LICENSE](LICENSE), third-party attributions in [NOTICE](NOTICE)).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Licensed Apache-2.0 ([LICENSE](LICENSE), third-party attributions in [NOTICE](NOTICE)).
 
 ## Citation
 
