@@ -129,3 +129,27 @@ hints in the prompt (the tuning must carry the style by itself). Metrics:
 
 All four must hold for the feature to be documented as working; any miss
 is published as-is.
+
+## BENCH-5: Verified answer mode (pre-registered)
+
+Written and committed before implementation. Feature: answer_mode
+"verified" answers point lookups by copying field values from retrieved
+records deterministically; the LLM is not used for facts. Ambiguity
+(multiple records of the same entity with conflicting values) must list
+all candidates; retrieval below a score threshold must refuse.
+
+**Eval (`benchmarks/verified_eval.py`).**
+- V1 unambiguous: 60 point lookups on a per-entity deduplicated corpus
+  (2,000 -> deduped, seed 123, questions seed 11). Bar: value accuracy
+  = 1.000. Not 0.99. The mode exists to be exact.
+- V2 ambiguous: same questions on the raw corpus with duplicate
+  entities. Bar: wrong-value rate = 0.000 (every answer either carries
+  a correct value, or explicitly lists all candidate values, or
+  refuses; asserting a single incorrect value is the only failure).
+- V3 refusal: 20 questions about entities that do not exist in the
+  corpus. Bar: refusal rate = 1.000 (no fabricated answers).
+- V4 generative gate: with answer_mode "generative", any answer whose
+  figures are ungrounded is replaced by the verified/refusal fallback.
+  Bar: shipped ungrounded-figure rate = 0.000.
+
+All four bars must hold; results are published as measured either way.
