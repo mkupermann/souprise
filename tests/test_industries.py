@@ -8,7 +8,10 @@ import pytest
 
 from souprise import RAGConfig, SoupriseRAG
 from souprise.data.industries import (
-    ProfileError, generate_industry_data, list_profiles, load_profile,
+    ProfileError,
+    generate_industry_data,
+    list_profiles,
+    load_profile,
 )
 
 

@@ -56,8 +56,6 @@ def main():
         return m.group(0) if m else title
     entities_visible = {entity_of(index_entries[i]["id"])
                         for i in range(len(mask)) if mask[i]}
-    entities_forbidden = {entity_of(index_entries[i]["id"])
-                          for i in range(len(mask)) if not mask[i]}
     titles_visible = {index_entries[i]["id"] for i in range(len(mask)) if mask[i]}
     titles_forbidden = {index_entries[i]["id"]
                         for i in range(len(mask)) if not mask[i]}

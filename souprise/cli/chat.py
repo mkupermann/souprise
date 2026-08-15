@@ -165,7 +165,9 @@ def chat(
         rag.retriever = SimpleHDCRetriever.load(index)
     elif industry:
         from souprise.data.industries import (
-            ProfileError, generate_industry_data, load_profile,
+            ProfileError,
+            generate_industry_data,
+            load_profile,
         )
         try:
             profile = load_profile(industry)
@@ -302,7 +304,9 @@ def query(
         rag.retriever = SimpleHDCRetriever.load(index)
     elif industry:
         from souprise.data.industries import (
-            ProfileError, generate_industry_data, load_profile,
+            ProfileError,
+            generate_industry_data,
+            load_profile,
         )
         try:
             profile = load_profile(industry)
