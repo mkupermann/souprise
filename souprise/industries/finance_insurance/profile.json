@@ -1,0 +1,78 @@
+{
+  "name": "finance_insurance",
+  "display": "Finance & Insurance",
+  "description": "Policies, claims, premium invoices and customer risk profiles for insurers and financial service providers.",
+  "vocabulary": ["policy", "claim", "premium", "coverage", "deductible", "underwriting", "loss ratio"],
+  "entities": {
+    "Policy": {"prefix": "Policy_", "count": 400},
+    "Claim": {"prefix": "Claim_", "count": 300},
+    "Customer": {"prefix": "Client_", "count": 250}
+  },
+  "record_types": [
+    {
+      "type": "Insurance Policy",
+      "title": "Insurance Policy {entity}",
+      "entity": "Policy",
+      "weight": 0.3,
+      "tags": ["policy"],
+      "fields": [
+        {"name": "Holder", "kind": "entity", "ref": "Customer"},
+        {"name": "Product Line", "kind": "choice", "values": ["Motor", "Property", "Liability", "Health", "Life"]},
+        {"name": "Amount", "kind": "money", "min": 200, "max": 9000},
+        {"name": "Coverage Limit", "kind": "money", "min": 50000, "max": 5000000},
+        {"name": "Status", "kind": "choice", "values": ["active", "lapsed", "cancelled"]},
+        {"name": "Region", "kind": "choice", "values": ["North", "South", "East", "West", "EU", "US"]},
+        {"name": "Renewal Date", "kind": "date"}
+      ]
+    },
+    {
+      "type": "Claim",
+      "title": "Claim {entity}",
+      "entity": "Claim",
+      "weight": 0.3,
+      "tags": ["claim"],
+      "fields": [
+        {"name": "Policy", "kind": "entity", "ref": "Policy"},
+        {"name": "Amount", "kind": "money", "min": 100, "max": 250000},
+        {"name": "Status", "kind": "choice", "values": ["open", "approved", "rejected", "paid"]},
+        {"name": "Cause", "kind": "choice", "values": ["collision", "water damage", "fire", "theft", "storm", "liability"]},
+        {"name": "Region", "kind": "choice", "values": ["North", "South", "East", "West", "EU", "US"]},
+        {"name": "Filed Date", "kind": "date"}
+      ]
+    },
+    {
+      "type": "Premium Invoice",
+      "title": "Premium Invoice {entity}",
+      "entity": "Policy",
+      "weight": 0.2,
+      "tags": ["invoice"],
+      "fields": [
+        {"name": "Holder", "kind": "entity", "ref": "Customer"},
+        {"name": "Amount", "kind": "money", "min": 50, "max": 3000},
+        {"name": "Status", "kind": "choice", "values": ["paid", "open", "overdue"]},
+        {"name": "Region", "kind": "choice", "values": ["North", "South", "East", "West", "EU", "US"]},
+        {"name": "Due Date", "kind": "date"}
+      ]
+    },
+    {
+      "type": "Client Risk Profile",
+      "title": "Client Risk Profile {entity}",
+      "entity": "Customer",
+      "weight": 0.2,
+      "tags": ["customer"],
+      "fields": [
+        {"name": "Segment", "kind": "choice", "values": ["retail", "SME", "corporate"]},
+        {"name": "Risk Score", "kind": "int", "min": 1, "max": 100},
+        {"name": "Annual Revenue", "kind": "money", "min": 20000, "max": 80000000},
+        {"name": "Open Tickets", "kind": "int", "min": 0, "max": 12},
+        {"name": "Region", "kind": "choice", "values": ["North", "South", "East", "West", "EU", "US"]}
+      ]
+    }
+  ],
+  "policy_templates": {
+    "claims_handler": {
+      "visible_where": {"Region": ["EU"]},
+      "hidden_fields": ["Risk Score"]
+    }
+  }
+}

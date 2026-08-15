@@ -59,6 +59,28 @@ def gui(
 
 
 @app.command()
+def industries():
+    """List installed industry profiles."""
+    from rich.table import Table
+
+    from souprise.data.industries import list_profiles, load_profile
+    console = Console()
+    names = list_profiles()
+    if not names:
+        console.print("No industry profiles installed under industries/.")
+        return
+    table = Table(title="Industry profiles")
+    table.add_column("Name")
+    table.add_column("Display")
+    table.add_column("Record types")
+    for name in names:
+        profile = load_profile(name)
+        table.add_row(name, profile["display"],
+                      ", ".join(rt["type"] for rt in profile["record_types"]))
+    console.print(table)
+
+
+@app.command()
 def version():
     """Show Souprise version."""
     from souprise import __version__

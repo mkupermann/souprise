@@ -334,6 +334,18 @@ souprise chat --model ./souprise_model
   <sub>An interactive session over 2,000 records, recorded live. Retrieval takes about 35 ms per question, the local 0.5B model answers in about 1.3 s, and every answer names the records it came from. Ctrl+C ends it. No session data leaves the machine.</sub>
 </p>
 
+## Industry Profiles
+
+Vertical fit is configuration, not a fork. An industry profile is one JSON file describing entities, record types and field generators; a generic seeded generator turns it into records the verified and compute paths understand unchanged. Two profiles ship today, Finance & Insurance and Logistics, twelve more are tracked as issues ([#58](https://github.com/mkupermann/souprise/issues/58) onward).
+
+```bash
+souprise industries                                        # list installed profiles
+souprise chat --industry finance_insurance                 # chat over insurance demo data
+souprise index build --synthetic 10000 --industry logistics
+```
+
+Each profile carries its own vocabulary and policy templates, so a claims handler demo with region restrictions works out of the box. Adding your industry means writing one JSON file, not touching code — the schema is documented by the two shipped examples and pinned by the test suite.
+
 ## Synthetic Business Data
 
 Six ERP/CRM entity types ship as generators. Seeded, reproducible, and containing no real customer information. Use them to test fine-tuning and retrieval before any real data gets involved.

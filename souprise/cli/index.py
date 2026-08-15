@@ -42,6 +42,9 @@ def build(
         None, help="Build from N synthetic business records instead of a file"
     ),
     seed: int = typer.Option(42, help="Seed for --synthetic"),
+    industry: Optional[str] = typer.Option(
+        None, help="Industry profile for --synthetic (see 'souprise "
+                   "industries list')"),
     tenant: Optional[str] = typer.Option(
         None, help="Write the index into this tenant's directory "
                    "(creates the tenant if needed)"),
@@ -86,6 +89,17 @@ def build(
             console.print("[red]--from-postgres requires --query.[/red]")
             raise typer.Exit(1)
         entries = importers.load_postgres(from_postgres, query, id_column, text_cols, tag_cols)
+    elif industry:
+        from souprise.data.industries import (
+            ProfileError, generate_industry_data, load_profile,
+        )
+        try:
+            profile = load_profile(industry)
+        except ProfileError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
+        entries = [e.to_retrieval_format() for e in
+                   generate_industry_data(profile, n=synthetic, seed=seed)]
     else:
         from souprise.data.generators.business import generate_business_data
         entries = [e.to_retrieval_format() for e in generate_business_data(n=synthetic, seed=seed)]

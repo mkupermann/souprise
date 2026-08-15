@@ -102,6 +102,11 @@ def chat(
         "tenants",
         help="Base directory holding all tenants"
     ),
+    industry: Optional[str] = typer.Option(
+        None,
+        help="Industry profile for the synthetic data (see 'souprise "
+             "industries list'). Ignored with --index."
+    ),
     verbose: bool = typer.Option(
         False,
         help="Show verbose output"
@@ -158,6 +163,18 @@ def chat(
         if verbose:
             console.print(f"[yellow]Loading index {index}...[/yellow]")
         rag.retriever = SimpleHDCRetriever.load(index)
+    elif industry:
+        from souprise.data.industries import (
+            ProfileError, generate_industry_data, load_profile,
+        )
+        try:
+            profile = load_profile(industry)
+        except ProfileError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
+        console.print(f"[yellow]Industry profile: {profile['display']}[/yellow]")
+        entries = generate_industry_data(profile, n=data_size, seed=42)
+        rag.index_from_entries([e.to_retrieval_format() for e in entries])
     else:
         if verbose:
             console.print("[yellow]Generating synthetic business data...[/yellow]")
@@ -252,6 +269,8 @@ def query(
         None, help="Tenant name; uses that tenant's index, audit and policies"),
     tenant_dir: str = typer.Option(
         "tenants", help="Base directory holding all tenants"),
+    industry: Optional[str] = typer.Option(
+        None, help="Industry profile for synthetic data (ignored with --index)"),
 ):
     """Ask a single question and get an answer.
 
@@ -281,6 +300,17 @@ def query(
             raise typer.Exit(1)
         from souprise.core.hdc import SimpleHDCRetriever
         rag.retriever = SimpleHDCRetriever.load(index)
+    elif industry:
+        from souprise.data.industries import (
+            ProfileError, generate_industry_data, load_profile,
+        )
+        try:
+            profile = load_profile(industry)
+        except ProfileError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
+        entries = generate_industry_data(profile, n=data_size, seed=42)
+        rag.index_from_entries([e.to_retrieval_format() for e in entries])
     else:
         rag.index_from_business_data(n=data_size, seed=42)
     if mode in ("generative", "styled"):

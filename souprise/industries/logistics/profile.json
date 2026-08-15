@@ -1,0 +1,77 @@
+{
+  "name": "logistics",
+  "display": "Logistics",
+  "description": "Shipments, warehouse stock, carrier invoices and delivery orders for logistics operators and shippers.",
+  "vocabulary": ["shipment", "carrier", "consignment", "warehouse", "freight", "waybill", "last mile"],
+  "entities": {
+    "Shipment": {"prefix": "Shipment_", "count": 400},
+    "Warehouse": {"prefix": "WH_", "count": 40},
+    "Carrier": {"prefix": "Carrier_", "count": 60},
+    "Order": {"prefix": "Order_", "count": 300}
+  },
+  "record_types": [
+    {
+      "type": "Shipment",
+      "title": "Shipment {entity}",
+      "entity": "Shipment",
+      "weight": 0.35,
+      "tags": ["shipment"],
+      "fields": [
+        {"name": "Carrier", "kind": "entity", "ref": "Carrier"},
+        {"name": "Origin", "kind": "choice", "values": ["Hamburg", "Rotterdam", "Antwerp", "Gdansk", "Valencia", "Shanghai", "Newark"]},
+        {"name": "Destination", "kind": "choice", "values": ["Munich", "Lyon", "Milan", "Vienna", "Prague", "Madrid", "Chicago"]},
+        {"name": "Status", "kind": "choice", "values": ["in transit", "delivered", "delayed", "customs hold"]},
+        {"name": "Weight", "kind": "int", "min": 50, "max": 24000},
+        {"name": "Region", "kind": "choice", "values": ["EU", "US", "APAC"]},
+        {"name": "ETA", "kind": "date"}
+      ]
+    },
+    {
+      "type": "Warehouse Stock",
+      "title": "Warehouse Stock {entity}",
+      "entity": "Warehouse",
+      "weight": 0.2,
+      "tags": ["stock"],
+      "fields": [
+        {"name": "Stock", "kind": "int", "min": 0, "max": 90000},
+        {"name": "Capacity Used", "kind": "percent", "min": 10, "max": 100},
+        {"name": "Region", "kind": "choice", "values": ["EU", "US", "APAC"]},
+        {"name": "Status", "kind": "choice", "values": ["operational", "at capacity", "maintenance"]}
+      ]
+    },
+    {
+      "type": "Carrier Invoice",
+      "title": "Carrier Invoice {entity}",
+      "entity": "Shipment",
+      "weight": 0.25,
+      "tags": ["invoice"],
+      "fields": [
+        {"name": "Carrier", "kind": "entity", "ref": "Carrier"},
+        {"name": "Amount", "kind": "money", "min": 120, "max": 45000},
+        {"name": "Status", "kind": "choice", "values": ["paid", "open", "overdue", "disputed"]},
+        {"name": "Region", "kind": "choice", "values": ["EU", "US", "APAC"]},
+        {"name": "Due Date", "kind": "date"}
+      ]
+    },
+    {
+      "type": "Delivery Order",
+      "title": "Delivery Order {entity}",
+      "entity": "Order",
+      "weight": 0.2,
+      "tags": ["order"],
+      "fields": [
+        {"name": "Shipment", "kind": "entity", "ref": "Shipment"},
+        {"name": "Quantity", "kind": "int", "min": 1, "max": 4000},
+        {"name": "Status", "kind": "choice", "values": ["confirmed", "picked", "shipped", "delivered", "cancelled"]},
+        {"name": "Region", "kind": "choice", "values": ["EU", "US", "APAC"]},
+        {"name": "Promised Date", "kind": "date"}
+      ]
+    }
+  ],
+  "policy_templates": {
+    "eu_dispatcher": {
+      "visible_where": {"Region": ["EU"]},
+      "hidden_fields": []
+    }
+  }
+}
