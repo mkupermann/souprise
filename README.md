@@ -15,7 +15,11 @@
 
 > Ask questions about invoices, orders, customers and KPIs, on your own hardware, and get answers that are **correct by construction**: in the default verified mode every value is copied verbatim from your records, never generated. It all runs locally; point `model_path` at a local folder and nothing ever touches the network.
 
-**Correctness is priority one here, speed is priority two.** Three hard guarantees, each measured against pre-registered bars ([verified-mode report](benchmarks/results/verified_report.md)):
+## The One Principle
+
+> **Souprise doesn't sell answers. It sells the certainty that the answer is correct.**
+
+Every design decision passes this test. If a feature endangers correctness even marginally, it stays out. If a feature increases traceability, it goes in. **Correctness is priority one, speed is priority two.** Three hard guarantees, each measured against pre-registered bars ([verified-mode report](benchmarks/results/verified_report.md)):
 
 1. **No generated figures.** The default [verified mode](#verified-answers) keeps the language model off the factual path — values are copied from cited records. Measured value accuracy: **1.000**.
 2. **Refusal beats guessing.** Unknown entities and weak retrieval get an explicit refusal, never the closest lookalike. Measured refusal rate on unknown entities: **1.000**; wrong values under conflicting records: **0.000** (all candidates are listed instead).
