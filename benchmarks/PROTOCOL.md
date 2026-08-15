@@ -172,3 +172,31 @@ must fall back to the deterministic text; fallback rate is reported but
 has no bar — honesty over beauty).
 
 Both bars must hold; results are published as measured.
+
+## BENCH-7: Foreign-question coverage and natural-name entities (pre-registered)
+
+Written and committed before the foreign question set existed and before
+any run.
+
+**Q1 foreign-question coverage.** A question set written by a DIFFERENT
+model (Mistral via the vibe CLI), which has never seen the parser code,
+phrases realistic business questions against the shipped record types.
+The set is committed to benchmarks/data/foreign_questions.jsonl before
+the first measurement. Metrics on the verified pipeline:
+- coverage: fraction of answerable questions (point lookups and
+  aggregates within the data model) that land on the verified or
+  computed path rather than the record-dump/hint fallback.
+- wrong-value rate: unchanged requirement.
+Bars: coverage >= 0.85 on answerable questions AND wrong-value rate
+= 0.000. The parser may be extended between runs; the bars and the
+question set may not.
+
+**Q2 natural-name entity verification.** A test corpus whose entities are
+natural company names (ACME GmbH, Meyer & Söhne, ...) instead of
+underscore identifiers.
+- known names: value accuracy = 1.000 (30 lookups).
+- unknown names (20 questions about companies absent from the corpus):
+  refusal rate = 1.000.
+- wrong-value rate = 0.000 throughout.
+
+All bars must hold; results are published as measured.
