@@ -164,6 +164,11 @@ souprise index add --path souprise_index.db --from-csv todays_invoices.csv --id-
 
 The fine-tuned model only needs retraining when the shape of your data changes, new record types or new fields, not when new rows arrive. Day-to-day freshness is an index append, and the append is covered by the test suite.
 
+<p align="center">
+  <img src="docs/assets/daily.gif" alt="Daily update proof: build a 10,000-record index, append three new invoices from a CSV in a quarter second, search finds them immediately, and the local model answers with the correct amount" width="1000"><br>
+  <sub>Recorded live. A 10,000-record index gets today's three invoices appended in 0.24 s, the new record is the top hit immediately, and the local model answers with the correct status and amount. No training happened anywhere in this clip.</sub>
+</p>
+
 ## Installation
 
 ```bash
