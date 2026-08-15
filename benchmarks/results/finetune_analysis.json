@@ -1,0 +1,97 @@
+{
+  "protocol": "benchmarks/PROTOCOL.md BENCH-3",
+  "base": {
+    "untuned": {
+      "accuracy": 0.7333,
+      "concise_accuracy": 0.7333
+    },
+    "tuned": {
+      "accuracy": 0.7167,
+      "concise_accuracy": 0.7
+    }
+  },
+  "decomposition": {
+    "untuned": {
+      "misses": 16,
+      "retrieval_miss": 0,
+      "extraction_failure": 16,
+      "miss_indices": [
+        0,
+        3,
+        8,
+        9,
+        10,
+        13,
+        16,
+        19,
+        20,
+        21,
+        32,
+        33,
+        35,
+        41,
+        49,
+        55
+      ]
+    },
+    "tuned": {
+      "misses": 17,
+      "retrieval_miss": 0,
+      "extraction_failure": 17,
+      "miss_indices": [
+        0,
+        3,
+        8,
+        9,
+        10,
+        13,
+        16,
+        19,
+        20,
+        32,
+        33,
+        35,
+        40,
+        41,
+        49,
+        50,
+        55
+      ]
+    },
+    "shared_misses": 15
+  },
+  "s1_harder": {
+    "untuned": {
+      "accuracy": 0.5333,
+      "concise_accuracy": 0.5333
+    },
+    "tuned": {
+      "accuracy": 0.5333,
+      "concise_accuracy": 0.5333
+    }
+  },
+  "s2_concise_base": {
+    "untuned": 0.7333,
+    "tuned": 0.7
+  },
+  "s3_no_context": {
+    "untuned": {
+      "accuracy": 0.0167,
+      "concise_accuracy": 0.0
+    },
+    "tuned": {
+      "accuracy": 0.1167,
+      "concise_accuracy": 0.05
+    }
+  },
+  "bars": {
+    "s1": "tuned - untuned >= +0.05 (accuracy)",
+    "s2": "tuned - untuned >= +0.05 (concise accuracy, base setting)",
+    "s3": "memorization flagged iff tuned - untuned >= +0.10 without context"
+  },
+  "verdicts": {
+    "s1": "no_benefit",
+    "s2": "no_benefit",
+    "s3_memorization": "flagged"
+  }
+}

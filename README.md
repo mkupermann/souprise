@@ -310,7 +310,13 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 3. `soup train --config soup_config.yaml --yes` fine-tunes the base model locally and produces `./souprise_model`.
 4. `souprise chat --model ./souprise_model` runs RAG over your data with the tuned model, fully offline.
 
-**Measured, honestly: you may not need this step.** We ran the whole path for real (Soup/LoRA, 2,600 iterations on 3,883 synthetic examples) and evaluated tuned against untuned on 60 point lookups with identical retrieval context, per the pre-registered bars in [benchmarks/PROTOCOL.md](benchmarks/PROTOCOL.md). Result: untuned 0.733, tuned 0.717, verdict "no measurable benefit" at this scale — retrieval does the factual work, and the untuned instruct model reads the provided records just as well ([full report](benchmarks/results/finetune_report.md)). Fine-tuning stays available for real domain vocabulary or larger models; measure before assuming it helps.
+**Measured, honestly: you probably don't need this step.** We ran the whole path for real (Soup/LoRA, 2,600 iterations on 3,883 synthetic examples) and evaluated it under pre-registered bars ([protocol](benchmarks/PROTOCOL.md), [null result](benchmarks/results/finetune_report.md), [failure analysis](benchmarks/results/finetune_analysis.md)). Three findings, all published as measured:
+
+1. Tuning didn't help anywhere. Base setting 0.717 tuned vs 0.733 untuned, harder contexts 0.533 vs 0.533, format fidelity no better.
+2. Tuning **memorizes your training values**. With no records in the prompt, the tuned model reproduced training figures at 0.117 vs 0.017 untuned — for daily-changing data that means stale memorized numbers exactly when retrieval comes up empty.
+3. What actually fixed the errors was **data hygiene, not models**. Every single miss traced to entities with multiple conflicting records in the corpus. Deduplicating to one current record per entity took the untuned 0.5B from 0.733 to 1.000 — a bigger model (1.5B, 0.717) didn't. Keep stable ids and let `souprise index add`'s upsert semantics maintain one record per entity, and the smallest model reads your data nearly perfectly.
+
+Fine-tune for domain vocabulary or output format if you must, measure it with `benchmarks/finetune_eval.py` on your own data first, and re-run the memorization control afterwards.
 
 ## CLI Reference
 
