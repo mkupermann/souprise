@@ -21,10 +21,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from finetune_eval import _norm, make_eval_set  # noqa: E402
+
 from souprise.core.hdc import SimpleHDCRetriever  # noqa: E402
 from souprise.data.generators.business import generate_business_data  # noqa: E402
-
-from finetune_eval import _norm, make_eval_set  # noqa: E402
 
 
 def build(corpus_n, corpus_seed, questions, qseed, k):
