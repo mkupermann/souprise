@@ -90,6 +90,22 @@ def check_grounding(answer: str, sources_text: str, question: str = "") -> List[
     return sorted(_extract_numbers(answer) - allowed)
 
 
+def wrap_chat(tokenizer, prompt: str) -> str:
+    """Wrap a prompt with the tokenizer's chat template when it has one.
+
+    Instruct models (and everything fine-tuned through Soup) are trained
+    behind a chat template; sending raw text bypasses what the tuning
+    learned. Falls back to the raw prompt for plain tokenizers.
+    """
+    template = getattr(tokenizer, "chat_template", None)
+    if template and hasattr(tokenizer, "apply_chat_template"):
+        return tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False, add_generation_prompt=True,
+        )
+    return prompt
+
+
 def looks_like_aggregation(question: str) -> bool:
     """Heuristic: does the question ask for an aggregate over all records?
 
@@ -292,6 +308,7 @@ class MLXGenerator(BaseGenerator):
         # Set defaults
         max_tokens = kwargs.get("max_tokens", 256)
         temperature = kwargs.get("temperature", 0.7)
+        prompt = wrap_chat(self._tokenizer, prompt)
 
         try:
             # mlx-lm >= 0.20: sampling parameters go through a sampler object
@@ -374,7 +391,8 @@ class TorchGenerator(BaseGenerator):
         max_new_tokens = kwargs.get("max_tokens", 256)
         temperature = kwargs.get("temperature", 0.7)
 
-        inputs = self._tokenizer(prompt, return_tensors="pt")
+        inputs = self._tokenizer(wrap_chat(self._tokenizer, prompt),
+                                 return_tensors="pt")
         outputs = self._model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,

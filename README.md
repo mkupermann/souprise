@@ -316,7 +316,14 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 2. Tuning **memorizes your training values**. With no records in the prompt, the tuned model reproduced training figures at 0.117 vs 0.017 untuned — for daily-changing data that means stale memorized numbers exactly when retrieval comes up empty.
 3. What actually fixed the errors was **data hygiene, not models**. Every single miss traced to entities with multiple conflicting records in the corpus. Deduplicating to one current record per entity took the untuned 0.5B from 0.733 to 1.000 — a bigger model (1.5B, 0.717) didn't. Keep stable ids and let `souprise index add`'s upsert semantics maintain one record per entity, and the smallest model reads your data nearly perfectly.
 
-Fine-tune for domain vocabulary or output format if you must, measure it with `benchmarks/finetune_eval.py` on your own data first, and re-run the memorization control afterwards.
+**What fine-tuning IS measurably good for: your company's voice.** `souprise train style` takes a glossary (generic term to company term) and an answer template, and generates training data whose form carries your corporate language while every record value is randomized per run — stable memorization is impossible by construction, which matters for daily-changing data. Measured against the pre-registered BENCH-4 bars: the tuned model answers with company terminology and template structure in **98.3 %** of cases (untuned: 0 %) with no style hints in the prompt, memorization control clean, and factual accuracy holding at the guard limit ([full report including the failed first iteration](benchmarks/results/style_report.md)).
+
+```bash
+souprise train style --glossary examples/style/glossary_de.csv \
+    --answer-template examples/style/answer_template_de.txt
+```
+
+For anything else, measure before assuming tuning helps: `benchmarks/finetune_eval.py` and the memorization control in `benchmarks/style_eval.py` run on your own data.
 
 ## CLI Reference
 

@@ -148,6 +148,27 @@ class TestMultiTurnHistory:
         assert "CONVERSATION SO FAR:" not in gen.last_prompt
 
 
+class TestChatTemplateWrapping:
+    def test_wrapped_when_template_present(self):
+        from souprise.core.pipeline import wrap_chat
+
+        class FakeTok:
+            chat_template = "template"
+
+            def apply_chat_template(self, messages, tokenize, add_generation_prompt):
+                return f"<|user|>{messages[0]['content']}<|assistant|>"
+
+        assert wrap_chat(FakeTok(), "hello") == "<|user|>hello<|assistant|>"
+
+    def test_raw_without_template(self):
+        from souprise.core.pipeline import wrap_chat
+
+        class BareTok:
+            chat_template = None
+
+        assert wrap_chat(BareTok(), "hello") == "hello"
+
+
 class TestInjectionDelimiting:
     def test_records_marked_as_data(self):
         rag = SoupriseRAG(RAGConfig(retriever="simple"))

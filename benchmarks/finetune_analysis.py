@@ -23,7 +23,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from finetune_eval import _norm, make_eval_set  # noqa: E402
 
-from souprise.core.hdc import SimpleHDCRetriever  # noqa: E402
+from souprise.core.hdc import SimpleHDCRetriever
+from souprise.core.pipeline import wrap_chat  # noqa: E402
 from souprise.data.generators.business import generate_business_data  # noqa: E402
 
 
@@ -58,7 +59,7 @@ def main():
             models[tag] = (load(args.base, adapter_path=args.adapter)
                            if tag == "tuned" else load(args.base))
         model, tokenizer = models[tag]
-        return generate(model, tokenizer, prompt=prompt, max_tokens=80,
+        return generate(model, tokenizer, prompt=wrap_chat(tokenizer, prompt), max_tokens=80,
                         sampler=sampler)
 
     def run(scenario, eval_set, contexts, with_context=True):

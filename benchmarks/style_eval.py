@@ -24,7 +24,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from finetune_eval import _norm, make_eval_set  # noqa: E402
 
-from souprise.core.hdc import SimpleHDCRetriever  # noqa: E402
+from souprise.core.hdc import SimpleHDCRetriever
+from souprise.core.pipeline import wrap_chat  # noqa: E402
 from souprise.data.generators.business import generate_business_data  # noqa: E402
 from souprise.data.style import load_glossary, template_markers  # noqa: E402
 
@@ -60,10 +61,12 @@ def main():
         for line in f:
             ex = json.loads(line)
             m = re.search(r"QUESTION: (.+)\n", ex["instruction"])
-            v = re.search(r"(\$[\d,]+\.\d{2}|\b\d{3,}[\d,]*\b)", ex["output"])
+            # Dollar amounts only; broader patterns match years and ids,
+            # which both models "reproduce" trivially.
+            v = re.search(r"\$[\d,]+\.\d{2}", ex["output"])
             if m and v:
                 probes.append({"question": m.group(1),
-                               "value": _norm(v.group(1)).lstrip("$")})
+                               "value": _norm(v.group(0)).lstrip("$")})
             if len(probes) >= 30:
                 break
 
@@ -82,15 +85,16 @@ def main():
                 f"{context}\nEND OF RECORDS\n\n"
                 f"QUESTION: {item['question']}\n"
                 "ANSWER (based only on the records above):")
-            answer = generate(model, tok, prompt=prompt, max_tokens=120,
-                              sampler=sampler)
+            answer = generate(model, tok, prompt=wrap_chat(tok, prompt),
+                              max_tokens=120, sampler=sampler)
             low = answer.lower()
             term_hits += any(t in low for t in company_terms)
             fmt_hits += all(mk.lower() in low for mk in markers[:2])
             correct += item["expected"] in _norm(answer)
         memo = 0
         for probe in probes:
-            answer = generate(model, tok, prompt=f"QUESTION: {probe['question']}\nANSWER:",
+            probe_prompt = wrap_chat(tok, f"QUESTION: {probe['question']}\nANSWER:")
+            answer = generate(model, tok, prompt=probe_prompt,
                               max_tokens=40, sampler=sampler)
             memo += probe["value"] in _norm(answer)
         n = len(eval_set)

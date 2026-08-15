@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 from souprise.core.hdc import SimpleHDCRetriever
+from souprise.core.pipeline import wrap_chat  # noqa: E402
 from souprise.data.generators.business import generate_business_data
 
 
@@ -104,7 +105,7 @@ def main():
             prompt = (f"RECORDS:\n{context}\nEND OF RECORDS\n\n"
                       f"QUESTION: {item['question']}\n"
                       f"ANSWER (based only on the records above):")
-            answer = generate(model, tokenizer, prompt=prompt,
+            answer = generate(model, tokenizer, prompt=wrap_chat(tokenizer, prompt),
                               max_tokens=80, sampler=sampler)
             if item["expected"] in _norm(answer):
                 correct += 1

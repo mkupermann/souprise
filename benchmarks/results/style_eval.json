@@ -1,0 +1,24 @@
+{
+  "untuned": {
+    "term_compliance": 0.0,
+    "format_compliance": 0.0,
+    "accuracy": 0.75,
+    "memorization_rate": 0.0
+  },
+  "tuned": {
+    "term_compliance": 0.9833,
+    "format_compliance": 0.9833,
+    "accuracy": 0.7,
+    "memorization_rate": 0.0
+  },
+  "bars": {
+    "style": "term delta >= +0.20 AND format delta >= +0.30",
+    "accuracy_guard": "tuned accuracy >= untuned - 0.05",
+    "memorization": "tuned memo rate <= untuned + 0.02"
+  },
+  "verdicts": {
+    "style": "works",
+    "accuracy_guard": "holds",
+    "memorization": "clean"
+  }
+}
