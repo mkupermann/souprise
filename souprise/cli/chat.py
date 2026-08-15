@@ -19,8 +19,9 @@ app = typer.Typer(help="Interactive chat with business data using RAG.")
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def chat(
+    ctx: typer.Context,
     model: Optional[str] = typer.Option(
         None,
         help="Path or HuggingFace ID for the LLM model "
@@ -56,6 +57,10 @@ def chat(
     Example:
         souprise chat --model ./souprise_model
     """
+    # A subcommand like `souprise chat query` handles the call itself.
+    if ctx.invoked_subcommand is not None:
+        return
+
     console.print(Panel(
         "[bold blue]Souprise[/bold blue] - Offline RAG for Business Data",
         border_style="blue"
@@ -119,7 +124,7 @@ def chat(
                                  f"Generation: {result.generation_latency*1000:.2f}ms | "
                                  f"Total: {result.total_latency*1000:.2f}ms[/dim]")
 
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, EOFError):
                 console.print("\n[yellow]Goodbye![/yellow]")
                 break
             except Exception as e:

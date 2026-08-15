@@ -202,6 +202,11 @@ soup train --config soup_config.yaml
 souprise chat --model ./souprise_model
 ```
 
+<p align="center">
+  <img src="docs/assets/chat.gif" alt="Interactive souprise chat session answering two questions about overdue invoices and a customer profile" width="1000"><br>
+  <sub>An interactive session over 2,000 records, recorded live. Retrieval takes about 35 ms per question, the local 0.5B model answers in about 1.3 s, and every answer names the records it came from. Ctrl+C ends it. No session data leaves the machine.</sub>
+</p>
+
 ## Synthetic Business Data
 
 Six ERP/CRM entity types ship as generators. Seeded, reproducible, and containing no real customer information. Use them to test fine-tuning and retrieval before any real data gets involved.
