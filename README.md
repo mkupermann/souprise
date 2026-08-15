@@ -27,6 +27,17 @@ Every design decision passes this test. If a feature endangers correctness even 
 
 Access control follows the same rule. **Record-level permissions are enforced before search**: a role's visibility mask is applied to the hypervector index before any distance is computed, so similarity scores over forbidden records never exist and cannot leak through ranking or answers. Field masks strip hidden values (a margin column, say) from answers, record dumps and aggregations, and an append-only audit log records every query with record hashes and an answer hash, immutability enforced by the database itself. Measured against pre-registered bars: **0 leaks across 200 policy queries, denial rate 1.000 on forbidden targets** ([RBAC report](benchmarks/results/rbac_report.md)). Pass a JSON policy with `--policy` and a log path with `--audit`. The honest limit: policies are in-process objects — user authentication and principal management arrive with the REST API (v0.3, [#29](https://github.com/mkupermann/souprise/issues/29)).
 
+## For business readers
+
+If the paragraphs above sounded like engineering, this is the short version. Souprise is a very accurate search engine for your company data. Invoices, orders, customer records. You ask in plain language and get the answer in well under a second, with the source records attached.
+
+- **No invented numbers.** Every figure in an answer is copied from your records, never made up by an AI. When the data doesn't contain the answer, the tool says so instead of guessing. We measure this and publish the results.
+- **Your data stays in the house.** Everything runs on your own machine. No cloud, no account, no data leaves the building.
+- **Works with what you have.** Excel, CSV or a database connection. Tested with a million records answering in a tenth of a second.
+- **Access rights and an audit trail.** Roles see only their records, and every question and answer is logged in a tamper-proof journal.
+
+Think of it as a search engine for your business data that guarantees every number is real. The one-page [decision maker brief](docs/FOR_DECISION_MAKERS.md) has the cost argument and the honest limits. Or jump to the [quick start](#quick-start) and [the benchmarks](#retrieval-at-scale).
+
 <p align="center">
   <img src="docs/assets/demo.gif" alt="souprise demo, recorded live. System info, training data generation, Soup config, a 10,000-record retrieval benchmark, and a grounded answer from a local model." width="1000"><br>
   <sub>Recorded live on an Apple M-series laptop, nothing cut. The whole stack is loaded (MLX, JuiceHDC, Soup), 10,000 records index in 8 s with a 3.6 ms median query, and a local Qwen 0.5B answers a grounded question in 1.4 s. One machine's numbers, not a promise. Run <code>benchmarks/retrieval_bench.py</code> and get your own.</sub>
@@ -444,6 +455,29 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code 
   url    = {https://github.com/mkupermann/souprise}
 }
 ```
+
+## FAQ
+
+**Is Souprise production-ready?**
+For single-user local deployments, yes with eyes open. The correctness guarantees, retrieval scale and access policies are all [measured against pre-registered bars](benchmarks/PROTOCOL.md), and the status badge honestly says alpha. Multi-user operation needs the REST API with authentication, which is on the [roadmap](#project-status).
+
+**How does Souprise compare to LlamaIndex or LangChain?**
+Different goals. Those are frameworks for orchestrating embedding models, vector databases and LLM-written answers. Souprise is a self-contained tool built around one constraint they don't impose. The language model never produces a figure. Retrieval is deterministic NumPy with no embedding model and no vector database, and answers copy values from records or refuse. If you want a flexible framework, use theirs. If you want answers you can put in front of an auditor, that's what this is for.
+
+**Can I use it with my own data?**
+Yes. `souprise index build --from-csv your_data.csv` builds a persistent index, with `--from-xlsx`, `--from-jsonl` and `--from-postgres` for the other sources. See [Persistent Indexes and Connectors](#persistent-indexes-and-connectors).
+
+**Does it work offline?**
+The retriever has no network path at all. `quickstart()` downloads a public base model once; point `model_path` at a local folder instead and nothing touches the network, air gap included. The default verified mode needs no model whatsoever. No telemetry anywhere.
+
+**Which models are supported?**
+Any Hugging Face causal LM via MLX (Apple Silicon) or PyTorch (CUDA, ROCm, CPU). Mistral, Llama, Qwen, Phi or your own fine-tuned checkpoint. Optimized for the 0.5B to 7B range; see [Configuration](#configuration).
+
+**Can different users see different records?**
+Yes. A JSON policy passed with `--policy` restricts visibility before search and hides individual fields, and `--audit` writes an append-only query log. Measured in the [RBAC report](benchmarks/results/rbac_report.md). Authentication itself arrives with the REST API.
+
+**Why does it sometimes refuse to answer?**
+By design. When no record matches well enough, or an entity is unknown, refusing beats guessing. Every refusal says what it looked for, so you can fix the data instead of trusting a lookalike.
 
 ## Support
 
