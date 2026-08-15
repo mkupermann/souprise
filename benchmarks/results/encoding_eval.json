@@ -1,0 +1,15 @@
+{
+  "v1": {
+    "paraphrase": 1.0,
+    "typos": 0.96,
+    "shuffle": 1.0
+  },
+  "v2": {
+    "paraphrase": 0.95,
+    "typos": 0.83,
+    "shuffle": 0.89
+  },
+  "v2_coverage": 1.0,
+  "bars": "v2 must hold paraphrase recall and 1.000 coverage AND beat v1 on typos while not losing on shuffle",
+  "verdict": "keep_v1"
+}

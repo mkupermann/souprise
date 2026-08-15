@@ -126,6 +126,34 @@ class TestScale:
         assert [r.title for r in a] == [r.title for r in b]
         assert [r.score for r in a] == [r.score for r in b]
 
+    def test_sketch_prefilter_matches_exact_results(self):
+        """With the prefilter forced on, results and scores equal exact."""
+        entries = [
+            e.to_retrieval_format() for e in generate_business_data(n=2_000, seed=5)
+        ]
+        # With candidates == corpus size the two-stage path must be
+        # mathematically identical to the exact scan; smaller candidate
+        # sets are approximate by design and measured in BENCH-8 instead.
+        exact = SimpleHDCRetriever(sketch_threshold=10**9)
+        pre = SimpleHDCRetriever(sketch_threshold=0, sketch_candidates=1_999)
+        exact.index(entries)
+        pre.index(entries)
+        for query in ["overdue invoice Customer_0042", "stock of Product_AB",
+                      "budget Finance 2025"]:
+            a = exact.search(query, k=5)
+            b = pre.search(query, k=5)
+            assert [r.title for r in a] == [r.title for r in b]
+            assert [r.score for r in a] == [r.score for r in b]
+
+    def test_sketch_survives_add_and_delete(self):
+        retriever = SimpleHDCRetriever(sketch_threshold=0, sketch_candidates=3)
+        retriever.index(make_entries())
+        retriever.search("invoice", k=2)  # builds sketches
+        retriever.add([{"id": "NEW-9", "text": "Invoice Umbrella overdue 9900"}])
+        assert retriever.search("Umbrella overdue", k=1)[0].title == "NEW-9"
+        retriever.delete(["NEW-9"])
+        assert all(r.title != "NEW-9" for r in retriever.search("Umbrella", k=5))
+
     def test_add_appends_without_reindex(self):
         first = make_entries()
         retriever = SimpleHDCRetriever()

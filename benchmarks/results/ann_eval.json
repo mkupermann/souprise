@@ -1,0 +1,18 @@
+{
+  "corpus": 1000000,
+  "queries": 200,
+  "recall_at_5_vs_exact": 0.218,
+  "exact_median_ms": 135.84,
+  "prefilter_median_ms": 34.45,
+  "speedup": 3.94,
+  "sketch_build_seconds": 0.64,
+  "sketch_mb": 128.0,
+  "bars": {
+    "recall": ">= 0.99",
+    "speedup": ">= 5x"
+  },
+  "verdicts": {
+    "recall": "fail",
+    "speedup": "fail"
+  }
+}

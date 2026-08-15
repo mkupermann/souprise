@@ -129,13 +129,14 @@ The built-in retriever doesn't stop at 10,000 records.
 
 - **Exact, chunked search.** Hamming distances are computed in fixed-size blocks, so temporary memory stays near 80 MB at the default `chunk_rows` of 65,536, no matter how big the corpus gets. The tests prove chunked and unchunked search return identical results.
 - **Top-k by argpartition.** O(n) selection, no full sort.
-- **Hardware popcount** on NumPy 2.x, lookup-table fallback on older versions.
+- **Hardware popcount over 8-byte words** (padded uint64 views) on NumPy 2.x, lookup-table fallback on older versions. 1M records answer in 136 ms median, exactly.
+- **Two failed speedup candidates, published.** A sketch prefilter and a richer encoding both lost against their pre-registered bars; the simple exact design won ([report](benchmarks/results/bench8_report.md)).
 - **Incremental indexing.** `add(entries)` appends new records without re-encoding what's already there.
 - **Linear storage.** 1,250 bytes per entry, so 100,000 records need 125 MB of index.
 
 <p align="center">
   <img src="docs/assets/scale.gif" alt="Retrieval benchmark at 10,000 and then 1,000,000 records on the same machine" width="1000"><br>
-  <sub>Same laptop, same exact search, two corpus sizes. 10,000 records index in 8 s and answer in 3.8 ms. One million records build 1.25 GB of index in just under 8 minutes and answer in 371 ms median, with 20 of 20 self-retrieval hits. The recording pauses during the long build, nothing else is cut. One machine's numbers, not a promise.</sub>
+  <sub>Same laptop, same exact search, two corpus sizes. 10,000 records index in 8 s and answer in 3.8 ms. One million records build 1.25 GB of index in just under 8 minutes and answer in 371 ms median, with 20 of 20 self-retrieval hits. Since that recording, an exact-path optimization (hardware popcount over 8-byte words) brought the 1M median down to 136 ms with zero accuracy trade-off ([BENCH-8 report](benchmarks/results/bench8_report.md)). The recording pauses during the long build, nothing else is cut. One machine's numbers, not a promise.</sub>
 </p>
 
 ```bash

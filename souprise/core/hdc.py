@@ -19,7 +19,7 @@ import logging
 import re
 import sqlite3
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -28,11 +28,35 @@ from souprise.core.pipeline import BaseRetriever, RetrievalResult
 logger = logging.getLogger(__name__)
 
 DIMENSIONS = 10_000  # bits per hypervector
-PACKED_BYTES = DIMENSIONS // 8  # 1,250 bytes per entry
+PACKED_BYTES = DIMENSIONS // 8  # 1,250 bytes per entry (persisted size)
+# In memory, rows are padded to a multiple of 8 bytes so distances run on
+# uint64 views (hardware popcount over 8-byte words, ~2x faster). The pad
+# bytes are always zero and never persisted.
+STORAGE_BYTES = ((PACKED_BYTES + 7) // 8) * 8  # 1,256
 INDEX_SCHEMA_VERSION = 1
 # Vectors are persisted in blocks of this many rows (~82 MB per block),
 # well under SQLite's 1 GB single-blob limit even for huge corpora.
 _SAVE_BLOCK_ROWS = 65_536
+
+# Sketch prefilter: a seeded sample of bit positions per vector gives a
+# cheap first-pass Hamming estimate; the exact distance re-ranks the
+# candidate set, so returned scores are always exact.
+SKETCH_BITS = 1_024
+# Whole sampled bytes: same Hamming mechanics, no bit unpacking on build.
+_SKETCH_BYTES = np.sort(
+    np.random.RandomState(4242).choice(PACKED_BYTES, SKETCH_BITS // 8,
+                                       replace=False))
+_SKETCH_STORAGE = ((SKETCH_BITS // 8 + 7) // 8) * 8
+DEFAULT_SKETCH_THRESHOLD = 10**12  # prefilter failed its BENCH-8 bars: opt-in only
+DEFAULT_SKETCH_CANDIDATES = 25_000
+
+
+def _popcount_rows(a64: np.ndarray, b64: np.ndarray) -> np.ndarray:
+    """Row-wise Hamming distance between uint64-viewed packed rows."""
+    block = np.bitwise_xor(a64, b64)
+    counts = np.bitwise_count(block) if _HAS_BITWISE_COUNT else _POPCOUNT8[
+        block.view(np.uint8)]
+    return counts.sum(axis=1, dtype=np.int64)
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -81,11 +105,37 @@ class SimpleHDCRetriever(BaseRetriever):
             working set around 80 MB even for million-entry corpora.
     """
 
-    def __init__(self, chunk_rows: int = 65_536):
+    def __init__(self, chunk_rows: int = 65_536,
+                 sketch_threshold: int = DEFAULT_SKETCH_THRESHOLD,
+                 sketch_candidates: int = DEFAULT_SKETCH_CANDIDATES,
+                 encoding: str = "v1"):
+        if encoding not in ("v1", "v2"):
+            raise ValueError(f"Unknown encoding '{encoding}'")
+        # v1: unigrams + word bigrams. v2 adds character trigrams per
+        # token (typo robustness) and a mild positional permutation on
+        # unigrams. v2 becomes default only if it wins BENCH-8 E.
+        self.encoding = encoding
         self.chunk_rows = chunk_rows
-        self._packed: np.ndarray = np.empty((0, PACKED_BYTES), dtype=np.uint8)
+        # Above this many rows, search runs the sketch prefilter followed
+        # by exact re-ranking; 0 forces it on, a huge value forces exact.
+        self.sketch_threshold = sketch_threshold
+        self.sketch_candidates = sketch_candidates
+        self._packed: np.ndarray = np.empty((0, STORAGE_BYTES), dtype=np.uint8)
+        self._sketches: Optional[np.ndarray] = None
         self._entries: List[Dict[str, Any]] = []
         self._token_cache: Dict[str, np.ndarray] = {}
+
+    def _sketch_of(self, packed_rows: np.ndarray) -> np.ndarray:
+        """1,024-bit sketches: a seeded sample of whole vector bytes,
+        padded for uint64 distance computation."""
+        sketches = np.zeros((packed_rows.shape[0], _SKETCH_STORAGE),
+                            dtype=np.uint8)
+        sketches[:, :SKETCH_BITS // 8] = packed_rows[:, _SKETCH_BYTES]
+        return sketches
+
+    def _ensure_sketches(self) -> None:
+        if self._sketches is None or self._sketches.shape[0] != self._packed.shape[0]:
+            self._sketches = self._sketch_of(self._packed)
 
     @property
     def size(self) -> int:
@@ -94,23 +144,52 @@ class SimpleHDCRetriever(BaseRetriever):
 
     @property
     def index_bytes(self) -> int:
-        """Total bytes used by the packed hypervector index."""
-        return self._packed.nbytes
+        """Bytes of persisted hypervector storage (1,250 per entry)."""
+        return len(self._entries) * PACKED_BYTES
+
+    def _vec(self, token: str) -> np.ndarray:
+        vec = self._token_cache.get(token)
+        if vec is None:
+            vec = _token_vector(token)
+            self._token_cache[token] = vec
+        return vec
 
     def _encode(self, text: str) -> np.ndarray:
-        """Encode text into a packed 10,000-bit hypervector (1,250 bytes)."""
+        """Encode text into a packed 10,000-bit hypervector."""
+        if self.encoding == "v2":
+            return self._encode_v2(text)
         tokens = _tokenize(text)
         if not tokens:
-            return np.zeros(PACKED_BYTES, dtype=np.uint8)
+            return np.zeros(STORAGE_BYTES, dtype=np.uint8)
         acc = np.zeros(DIMENSIONS, dtype=np.int32)
         for token in tokens:
-            vec = self._token_cache.get(token)
-            if vec is None:
-                vec = _token_vector(token)
-                self._token_cache[token] = vec
-            acc += vec
+            acc += self._vec(token)
         majority = (2 * acc > len(tokens)).astype(np.uint8)
-        return np.packbits(majority)
+        row = np.zeros(STORAGE_BYTES, dtype=np.uint8)
+        row[:PACKED_BYTES] = np.packbits(majority)
+        return row
+
+    def _encode_v2(self, text: str) -> np.ndarray:
+        """v2: unigrams with mild positional permutation, word bigrams,
+        and character trigrams per token for typo robustness."""
+        unigrams = _TOKEN_RE.findall(text.lower())
+        if not unigrams:
+            return np.zeros(STORAGE_BYTES, dtype=np.uint8)
+        acc = np.zeros(DIMENSIONS, dtype=np.int32)
+        count = 0
+        for i, token in enumerate(unigrams):
+            acc += np.roll(self._vec(token), i % 8)
+            count += 1
+            for j in range(len(token) - 2):
+                acc += self._vec("c3:" + token[j:j + 3])
+                count += 1
+        for a, b in zip(unigrams, unigrams[1:]):
+            acc += self._vec(f"{a}_{b}")
+            count += 1
+        majority = (2 * acc > count).astype(np.uint8)
+        row = np.zeros(STORAGE_BYTES, dtype=np.uint8)
+        row[:PACKED_BYTES] = np.packbits(majority)
+        return row
 
     def index(self, entries: List[Dict[str, Any]]) -> None:
         """Index entries for retrieval, replacing any existing index.
@@ -123,8 +202,9 @@ class SimpleHDCRetriever(BaseRetriever):
         if vectors:
             self._packed = np.vstack(vectors)
         else:
-            self._packed = np.empty((0, PACKED_BYTES), dtype=np.uint8)
+            self._packed = np.empty((0, STORAGE_BYTES), dtype=np.uint8)
         self._entries = list(entries)
+        self._sketches = None  # rebuilt lazily on next prefiltered search
         logger.info(
             "Indexed %d entries in %.2fs (%d bytes of hypervectors)",
             len(entries), time.perf_counter() - start, self._packed.nbytes,
@@ -160,6 +240,7 @@ class SimpleHDCRetriever(BaseRetriever):
                     positions[entry_id] = len(self._entries) - 1
         if new_vectors:
             self._packed = np.vstack([self._packed, *new_vectors])
+        self._sketches = None
 
     def delete(self, ids: List[str]) -> int:
         """Remove entries by id. Returns the number of entries removed."""
@@ -172,6 +253,7 @@ class SimpleHDCRetriever(BaseRetriever):
         if removed:
             self._packed = self._packed[keep]
             self._entries = [self._entries[i] for i in keep]
+            self._sketches = None
         return removed
 
     def _hamming_distances(self, query_vec: np.ndarray) -> np.ndarray:
@@ -181,14 +263,12 @@ class SimpleHDCRetriever(BaseRetriever):
         chunk_rows * 1,250 bytes independent of corpus size.
         """
         n = self._packed.shape[0]
+        p64 = self._packed.view(np.uint64)
+        q64 = query_vec.view(np.uint64)
         distances = np.empty(n, dtype=np.int64)
         for start in range(0, n, self.chunk_rows):
-            block = np.bitwise_xor(self._packed[start:start + self.chunk_rows], query_vec)
-            if _HAS_BITWISE_COUNT:
-                counts = np.bitwise_count(block)
-            else:
-                counts = _POPCOUNT8[block]
-            distances[start:start + self.chunk_rows] = counts.sum(axis=1)
+            distances[start:start + self.chunk_rows] = _popcount_rows(
+                p64[start:start + self.chunk_rows], q64)
         return distances
 
     def search(self, query: str, k: int = 5) -> List[RetrievalResult]:
@@ -201,10 +281,31 @@ class SimpleHDCRetriever(BaseRetriever):
             raise RuntimeError("Retriever not initialized. Call index() first.")
 
         query_vec = self._encode(query)
-        distances = self._hamming_distances(query_vec)
-        k = min(k, len(self._entries))
-        top = np.argpartition(distances, k - 1)[:k]
-        top = top[np.argsort(distances[top])]
+        n = len(self._entries)
+        k = min(k, n)
+
+        n_candidates = max(self.sketch_candidates, k)
+        if n > self.sketch_threshold and n_candidates < n:
+            # Two-stage: cheap sketch pass selects candidates, the exact
+            # distance re-ranks them. Scores returned are always exact.
+            self._ensure_sketches()
+            query_sketch = self._sketch_of(query_vec.reshape(1, -1))[0]
+            sketch_dist = _popcount_rows(self._sketches.view(np.uint64),
+                                         query_sketch.view(np.uint64))
+            candidates = np.argpartition(
+                sketch_dist, n_candidates - 1)[:n_candidates]
+            cand_dist = _popcount_rows(
+                np.ascontiguousarray(self._packed[candidates]).view(np.uint64),
+                query_vec.view(np.uint64))
+            order = np.argpartition(cand_dist, k - 1)[:k]
+            order = order[np.argsort(cand_dist[order])]
+            top = candidates[order]
+            distances = np.empty(n, dtype=np.int64)
+            distances[top] = cand_dist[order]
+        else:
+            distances = self._hamming_distances(query_vec)
+            top = np.argpartition(distances, k - 1)[:k]
+            top = top[np.argsort(distances[top])]
 
         results = []
         for idx in top:
@@ -219,7 +320,8 @@ class SimpleHDCRetriever(BaseRetriever):
 
     def clear(self) -> None:
         """Clear the index."""
-        self._packed = np.empty((0, PACKED_BYTES), dtype=np.uint8)
+        self._packed = np.empty((0, STORAGE_BYTES), dtype=np.uint8)
+        self._sketches = None
         self._entries = []
         self._token_cache = {}
 
@@ -245,6 +347,7 @@ class SimpleHDCRetriever(BaseRetriever):
                 ("schema_version", str(INDEX_SCHEMA_VERSION)),
                 ("dimensions", str(DIMENSIONS)),
                 ("entry_count", str(len(self._entries))),
+                ("encoding", self.encoding),
             ])
             con.executemany(
                 "INSERT INTO entries VALUES (?, ?, ?, ?)",
@@ -257,7 +360,9 @@ class SimpleHDCRetriever(BaseRetriever):
             con.executemany(
                 "INSERT INTO vector_blocks VALUES (?, ?)",
                 (
-                    (b, self._packed[start:start + _SAVE_BLOCK_ROWS].tobytes())
+                    (b, np.ascontiguousarray(
+                        self._packed[start:start + _SAVE_BLOCK_ROWS,
+                                     :PACKED_BYTES]).tobytes())
                     for b, start in enumerate(
                         range(0, self._packed.shape[0], _SAVE_BLOCK_ROWS))
                 ),
@@ -283,7 +388,8 @@ class SimpleHDCRetriever(BaseRetriever):
                     f"Index at {path} uses {meta.get('dimensions')} bit vectors; "
                     f"this build expects {DIMENSIONS}."
                 )
-            retriever = cls(chunk_rows=chunk_rows)
+            retriever = cls(chunk_rows=chunk_rows,
+                            encoding=meta.get("encoding", "v1"))
             retriever._entries = [
                 {"id": entry_id, "text": text, "metadata": json.loads(metadata)}
                 for entry_id, text, metadata in con.execute(
@@ -295,7 +401,10 @@ class SimpleHDCRetriever(BaseRetriever):
                     "SELECT data FROM vector_blocks ORDER BY block")
             ]
             if blocks:
-                retriever._packed = np.vstack(blocks)
+                raw = np.vstack(blocks)
+                padded = np.zeros((raw.shape[0], STORAGE_BYTES), dtype=np.uint8)
+                padded[:, :PACKED_BYTES] = raw
+                retriever._packed = padded
             expected = int(meta.get("entry_count", len(retriever._entries)))
             if retriever._packed.shape[0] != expected:
                 raise ValueError(
