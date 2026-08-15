@@ -69,7 +69,7 @@ class RAGResult:
     blocked_generation: Optional[str] = None
 
 
-_NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?")
+_NUMBER_RE = re.compile(r"-?\$?\d[\d,]*(?:\.\d+)?")
 
 _AGGREGATION_MARKERS = (
     "total", "sum of", "average", "mean", "how many", "count of", "combined",
@@ -82,7 +82,9 @@ def _extract_numbers(text: str) -> set:
     """Canonical numeric strings worth checking (>= 100 or has decimals)."""
     numbers = set()
     for raw in _NUMBER_RE.findall(text):
-        cleaned = raw.lstrip("$").replace(",", "")
+        cleaned = raw.lstrip("-$").replace(",", "")
+        if raw.startswith("-"):
+            cleaned = "-" + cleaned
         try:
             value = float(cleaned)
         except ValueError:

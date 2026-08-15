@@ -127,7 +127,7 @@ When reporting issues, please include:
 
 ## Design Decisions
 
-Major design decisions are documented in [DESIGN.md](docs/DESIGN.md) (if it exists). For new features, please open an issue to discuss the design before implementing.
+Major design decisions are documented in the README architecture section (if it exists). For new features, please open an issue to discuss the design before implementing.
 
 ## Maintainers
 

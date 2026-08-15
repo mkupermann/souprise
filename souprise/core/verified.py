@@ -85,12 +85,15 @@ def _fields_of(result: RetrievalResult) -> Dict[str, str]:
 def _entity_of(title: str) -> str:
     """Entity key of a record title (strips time qualifiers)."""
     for token in title.split():
-        if "_" in token:
+        if _ENTITY_TOKEN_RE.fullmatch(token):
             return token
     return title
 
 
-_ENTITY_TOKEN_RE = re.compile(r"\b[A-Za-z]+_[A-Za-z0-9]+\b")
+# Underscore ids (Customer_0042) and hyphenated ids containing a digit
+# (INV-2026-0815); plain hyphenated words like "re-run" do not match.
+_ENTITY_TOKEN_RE = re.compile(
+    r"\b[A-Za-z]+_[A-Za-z0-9]+\b|\b[A-Za-z]+(?:-[A-Za-z0-9]*\d[A-Za-z0-9]*)+\b")
 
 # Company-shaped natural names: capitalized words ending in a legal-form
 # suffix, or "Name & Name" pairs.

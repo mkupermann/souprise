@@ -51,7 +51,7 @@ Optional dependencies (installed via extras):
    - Source: https://github.com/huggingface/transformers
    - Copyright: The HuggingFace Team
 
-9. FastAPI / Uvicorn / Pydantic — extra: api (planned REST mode)
+9. FastAPI / Uvicorn / Pydantic — extra: api (REST mode)
    - Licenses: MIT / BSD 3-Clause / MIT
    - Sources: https://github.com/tiangolo/fastapi,
      https://github.com/encode/uvicorn, https://github.com/pydantic/pydantic
