@@ -167,11 +167,11 @@ class HDCRetriever(BaseRetriever):
         if not self._initialized:
             raise RuntimeError("Retriever not initialized. Call index() first.")
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         # min_sim=0.0 keeps plain top-k semantics; JuiceHDC's default
         # threshold (0.51) can return fewer than k results.
         results = self._store.search(query, top_k=k, min_sim=0.0)
-        latency = time.time() - start_time
+        latency = time.perf_counter() - start_time
 
         logger.debug(f"Retrieved {len(results)} results in {latency*1000:.2f}ms")
 
@@ -234,7 +234,7 @@ class MLXGenerator(BaseGenerator):
 
         from mlx_lm import generate
 
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         # Set defaults
         max_tokens = kwargs.get("max_tokens", 256)
@@ -260,7 +260,7 @@ class MLXGenerator(BaseGenerator):
                 temperature=temperature
             )
 
-        latency = time.time() - start_time
+        latency = time.perf_counter() - start_time
         tokens_generated = len(self._tokenizer.encode(text))
 
         logger.debug(f"Generated {tokens_generated} tokens in {latency*1000:.2f}ms")
@@ -315,7 +315,7 @@ class TorchGenerator(BaseGenerator):
             raise RuntimeError("Generator not loaded. Call load() first.")
 
 
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         # Set defaults
         max_new_tokens = kwargs.get("max_tokens", 256)
@@ -330,7 +330,7 @@ class TorchGenerator(BaseGenerator):
         )
         text = self._tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        latency = time.time() - start_time
+        latency = time.perf_counter() - start_time
         tokens_generated = outputs.shape[1] - inputs["input_ids"].shape[1]
 
         return GenerationResult(
@@ -463,9 +463,9 @@ class SoupriseRAG:
         generator = self._get_generator()
 
         # Measure retrieval latency
-        retrieval_start = time.time()
+        retrieval_start = time.perf_counter()
         retrieval_results = retriever.search(question, k=k)
-        retrieval_latency = time.time() - retrieval_start
+        retrieval_latency = time.perf_counter() - retrieval_start
 
         # Build context
         context = "\n\n".join(
@@ -481,13 +481,13 @@ QUESTION: {question}
 ANSWER (based only on the context):"""
 
         # Measure generation latency
-        generation_start = time.time()
+        generation_start = time.perf_counter()
         gen_result = generator.generate(
             prompt,
             max_tokens=self.config.max_tokens,
             temperature=self.config.temperature
         )
-        generation_latency = time.time() - generation_start
+        generation_latency = time.perf_counter() - generation_start
 
         total_latency = retrieval_latency + generation_latency
 

@@ -112,7 +112,7 @@ class SimpleHDCRetriever(BaseRetriever):
         Args:
             entries: List of dicts with 'id', 'text', and optionally 'metadata'.
         """
-        start = time.time()
+        start = time.perf_counter()
         vectors = [self._encode(entry["text"]) for entry in entries]
         if vectors:
             self._packed = np.vstack(vectors)
@@ -121,7 +121,7 @@ class SimpleHDCRetriever(BaseRetriever):
         self._entries = list(entries)
         logger.info(
             "Indexed %d entries in %.2fs (%d bytes of hypervectors)",
-            len(entries), time.time() - start, self._packed.nbytes,
+            len(entries), time.perf_counter() - start, self._packed.nbytes,
         )
 
     def add(self, entries: List[Dict[str, Any]]) -> None:
