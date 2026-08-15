@@ -253,3 +253,30 @@ trigger). Refusals and denials are logged like answers.
 All bars must hold; results are published as measured. Honest scope
 note: policies are enforcement objects in-process; user authentication
 arrives with the REST API (#29).
+
+## BENCH-10: Multi-tenant isolation (pre-registered)
+
+Written and committed before implementation. Design under test: physical
+isolation — each tenant owns its index file, audit log and policy
+directory; there is no shared index and no tenant_id filtering.
+
+**T1 cross-tenant leak test.** Two tenants whose corpora deliberately
+share entity names but carry different values. 100 lookups per tenant.
+Bars, all = 0 occurrences:
+- no record content, title or value from tenant B appears in any
+  RAGResult field when querying as tenant A, and vice versa
+- values that exist only in the other tenant's corpus never appear
+
+**T2 correctness per tenant.** Value accuracy = 1.000 on lookups whose
+targets exist in the querying tenant's own corpus, for both tenants,
+including entities whose names collide across tenants (each tenant must
+get its OWN value).
+
+**T3 audit separation.** Each tenant's audit log contains exactly its
+own N queries and none of the other tenant's; both logs remain
+append-only (UPDATE/DELETE rejected).
+
+Known, documented scope: tenant selection is a CLI/config decision by
+the operator; per-user authentication arrives with the REST API (#29).
+Cross-tenant querying is intentionally impossible, not a missing
+feature.
