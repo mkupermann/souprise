@@ -200,3 +200,28 @@ underscore identifiers.
 - wrong-value rate = 0.000 throughout.
 
 All bars must hold; results are published as measured.
+
+## BENCH-8: Sub-linear search and encoding v2 (pre-registered)
+
+Written and committed before implementation and before any run.
+
+**S. Sketch prefilter with exact re-ranking (issue #38).** Two-stage
+search: per-vector bit sketch (default 256 sampled bit positions,
+seeded), cheap Hamming pass selects C candidates (default 5,000), exact
+Hamming re-ranks them. Returned scores are always exact.
+Locked bars, measured at 1,000,000 records with 200 lookup queries:
+- recall@5 vs the exact scan >= 0.99
+- median query speedup vs the exact scan >= 5x
+- BENCH-5 verified-mode suite unchanged green with the prefilter active
+Only if all three hold does the prefilter become the default for indexes
+above 50,000 records, with exact search remaining one flag away.
+
+**E. Encoding v2: positional permutation + trigram binding (issue #39).**
+Candidate encoder alongside v1. Locked adoption rule:
+- must hold 1.000 recall on the BENCH-1 paraphrase set and 1.000
+  coverage on the frozen foreign-question set, and keep BENCH-5 green
+- must beat v1 on a new deterministic robustness set (seeded typos in
+  non-entity words and word-order shuffles, committed before the run)
+If v2 loses anywhere, v1 stays default, v2 stays opt-in, and the loss is
+published. Index metadata records the encoding version; loading an index
+with a mismatched encoding version fails loudly (reproducibility).
