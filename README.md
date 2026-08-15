@@ -57,7 +57,7 @@ Souprise answers from your records, so the useful questions are the ones your te
 | Marketing | Which products are trending down despite high stock? Which segments carry the most annual revenue per region? How is the marketing budget tracking against its allocation? | Products, segments, KPIs, budgets |
 | Service | Which enterprise customers sit on more than five open tickets? What's the fulfillment status of a customer's last order? Which departments miss their satisfaction targets? | Customer profiles, orders, KPIs |
 
-Two honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data today means exporting it and calling `index_from_entries`, three fields per record. SAP, DATEV and Excel importers are roadmap items (v0.3), not current features.
+Two honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data works today through `souprise index build` with CSV, Excel, JSONL or a PostgreSQL query (see [Persistent Indexes and Connectors](#persistent-indexes-and-connectors)). Native SAP and DATEV integration is a roadmap item (v0.3), not a current feature.
 
 ## Design Principles
 
@@ -296,6 +296,7 @@ The suite runs against the core install alone. No model downloads, no optional e
 - `tests/test_hdc_retriever.py` checks the storage claim (10,000 bits are 1,250 bytes per entry), deterministic encoding, retrieval relevance, a 25,000-record scale test, chunked-search equivalence and incremental `add()`.
 - `tests/test_pipeline.py` runs the whole query path with the built-in retriever and a stub generator, plus backend resolution and custom-retriever injection.
 - `tests/test_data_generators.py` covers reproducibility and format guarantees.
+- `tests/test_persistence_importers.py` covers the save/load round trip with identical scores, the CSV, Excel and JSONL importers end to end, and a real-PostgreSQL round trip (runs wherever `SOUPRISE_TEST_PG_DSN` points at a database; CI provides one).
 
 ```bash
 pip install -e ".[dev]"
