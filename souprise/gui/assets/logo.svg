@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="120" viewBox="0 0 520 120" role="img" aria-label="Souprise">
+  <title>Souprise</title>
+  <desc>Souprise wordmark, gradient variant for dark backgrounds.</desc>
+  <defs>
+    <linearGradient id="brandDark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7FA8FF"/>
+      <stop offset="0.5" stop-color="#4FC0D8"/>
+      <stop offset="1" stop-color="#3FE0C4"/>
+    </linearGradient>
+  </defs>
+  <text x="260" y="82" text-anchor="middle"
+        font-family="'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-size="72" font-weight="700" letter-spacing="0.5"
+        fill="url(#brandDark)">Souprise</text>
+</svg>

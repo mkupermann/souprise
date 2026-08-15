@@ -1,0 +1,13 @@
+services:
+  souprise:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist downloaded models across container restarts
+      - hf-cache:/root/.cache/huggingface
+      # Drop your CSV exports here to index them from the GUI host side
+      - ./examples:/app/examples:ro
+
+volumes:
+  hf-cache:

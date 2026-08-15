@@ -24,7 +24,7 @@
 
 ## What is Souprise?
 
-Souprise is a toolkit for building business AI that stays in the building. Retrieval-augmented generation is the runtime path, but the repo covers the whole route from raw data to grounded answers. Four parts, each useful on its own.
+Souprise is a toolkit for building business AI that stays in the building. Retrieval-augmented generation is the runtime path, but the repo covers the whole route from raw data to grounded answers. Four parts, each useful on its own. Not an engineer? The one-page [decision maker brief](docs/FOR_DECISION_MAKERS.md) covers the cost argument and the honest limits.
 
 | Component | What it does | Standalone use |
 |---|---|---|
@@ -171,6 +171,15 @@ The fine-tuned model only needs retraining when the shape of your data changes, 
 
 ## Installation
 
+The fastest look is one command, no Python setup needed. It builds a local container with the web interface and sample data, nothing leaves your machine.
+
+```bash
+git clone https://github.com/mkupermann/souprise.git && cd souprise
+docker compose up --build      # then open http://localhost:8501
+```
+
+For the real thing, install it directly.
+
 ```bash
 git clone https://github.com/mkupermann/souprise.git
 cd souprise
@@ -186,11 +195,21 @@ pip install -e .                # core: retrieval, data generators, CLI
 | JuiceHDC retrieval engine | `pip install -e ".[juicehdc]"` |
 | Excel importer | `pip install -e ".[excel]"` |
 | PostgreSQL connector | `pip install -e ".[postgres]"` |
+| Web interface | `pip install -e ".[gui]"` |
 | Development (tests, lint) | `pip install -e ".[dev]"` |
+
+## Web Interface
+
+`souprise gui` starts a local web interface for everyone who doesn't live in a terminal. Load an index or demo data, ask in plain language, see the answer with its source records and latencies. Search-only mode works without any model.
+
+<p align="center">
+  <img src="docs/assets/gui.png" alt="Souprise web interface answering a question about overdue EU invoices with source records and a 10 ms retrieval time" width="1000"><br>
+  <sub>10,000 records loaded, a question answered in 10 ms, every source record one click away. Requires the gui extra.</sub>
+</p>
 
 ## Quick Start
 
-The smallest possible start. Retrieval only, no model, no download.
+Committed sample data lives in [examples/](examples/), ninety seconds from clone to a working index. The smallest possible start in code. Retrieval only, no model, no download.
 
 ```python
 from souprise import SimpleHDCRetriever
@@ -291,6 +310,7 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 | `souprise index add` | Append new records to an existing index, encoding only the delta |
 | `souprise index info` | Show statistics of a persistent index |
 | `souprise index query "<question>"` | Search a persistent index without loading an LLM |
+| `souprise gui` | Start the local web interface |
 | `souprise info` | Show installed backends and versions |
 | `souprise version` | Show version |
 

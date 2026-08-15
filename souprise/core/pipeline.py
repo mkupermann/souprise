@@ -49,9 +49,10 @@ class RAGResult:
 
 
 # Default base models per backend, used when no model_path is given.
+# Chosen for small download size; override model_path for anything else.
 DEFAULT_MODELS = {
-    "mlx": "mlx-community/Phi-2-4bit",
-    "torch": "microsoft/phi-2",
+    "mlx": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+    "torch": "Qwen/Qwen2.5-0.5B-Instruct",
 }
 
 

@@ -27,6 +27,36 @@ app.add_typer(index_app, name="index", help="Manage the HDC index")
 
 
 @app.command()
+def gui(
+    port: int = typer.Option(8501, help="Port for the web interface"),
+):
+    """Start the local web interface (requires the 'gui' extra)."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    try:
+        import streamlit  # noqa: F401
+    except ImportError:
+        console = Console()
+        console.print('[red]Streamlit not installed. Install with: '
+                      'pip install -e ".[gui]"[/red]')
+        raise typer.Exit(1)
+
+    app_path = Path(__file__).parent.parent / "gui" / "app.py"
+    subprocess.run([
+        sys.executable, "-m", "streamlit", "run", str(app_path),
+        "--server.port", str(port),
+        "--browser.gatherUsageStats", "false",
+        "--theme.base", "dark",
+        "--theme.primaryColor", "#5CA8FF",
+        "--theme.backgroundColor", "#0D1524",
+        "--theme.secondaryBackgroundColor", "#111D33",
+        "--theme.textColor", "#EAF1FA",
+    ])
+
+
+@app.command()
 def version():
     """Show Souprise version."""
     from souprise import __version__

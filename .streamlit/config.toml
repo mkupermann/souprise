@@ -1,0 +1,10 @@
+# Souprise GUI theme, matching the repo's figure design system
+[theme]
+base = "dark"
+primaryColor = "#5CA8FF"
+backgroundColor = "#0D1524"
+secondaryBackgroundColor = "#111D33"
+textColor = "#EAF1FA"
+
+[browser]
+gatherUsageStats = false

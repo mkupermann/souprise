@@ -53,6 +53,8 @@ juicehdc = [
 api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "pydantic>=2.0.0"]
 # Excel importer
 excel = ["openpyxl>=3.1.0"]
+# Local web interface
+gui = ["streamlit>=1.30.0"]
 # PostgreSQL connector
 postgres = ["psycopg2-binary>=2.9.9", "sqlalchemy>=2.0.0"]
 # Development: tests and linting; no git dependencies
