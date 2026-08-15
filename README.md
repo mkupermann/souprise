@@ -446,7 +446,11 @@ Souprise plays well with two sibling projects but needs neither.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Licensed Apache-2.0 ([LICENSE](LICENSE), third-party attributions in [NOTICE](NOTICE)).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Apache License 2.0 ([LICENSE](LICENSE)). In plain terms: use it freely, commercially included, embed it in closed products, no obligation to publish your own code. Keep the license text and the attribution ([NOTICE](NOTICE) lists all third-party components). The license's patent clause works in your favor as a user — every contributor automatically grants a patent license for their contribution, so nobody can contribute code and later sue you for using it.
 
 ## Citation
 
