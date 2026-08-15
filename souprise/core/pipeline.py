@@ -53,6 +53,15 @@ class RAGResult:
     # True when the question looks like an aggregation (sum/average/count
     # across all records) that top-k retrieval cannot answer correctly.
     aggregation_hint: bool = False
+    # Verified mode: values were copied from records, never generated.
+    verified: bool = False
+    # The system declined to answer (no/weak retrieval match).
+    refused: bool = False
+    # Conflicting records for the same entity; all candidates are listed.
+    ambiguous: bool = False
+    # In generative mode, an answer that failed the grounding gate is
+    # replaced by the verified fallback; the blocked text is kept here.
+    blocked_generation: Optional[str] = None
 
 
 _NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?")
@@ -150,6 +159,11 @@ class RAGConfig:
     model_path: str = "./souprise_model"  # Path to fine-tuned model
     backend: str = "auto"  # "auto", "mlx" (Apple Silicon), "torch" (CUDA/ROCm/CPU)
     retriever: str = "auto"  # "auto", "simple" (built-in), or "juicehdc"
+    # "verified": values copied from records, no LLM on the factual path.
+    # "generative": LLM answers, hard-gated by the grounding check.
+    answer_mode: str = "verified"
+    min_retrieval_score: float = 0.52  # below this, verified mode refuses
+    answer_template: Optional[str] = None  # verified-answer template override
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
@@ -539,12 +553,33 @@ class SoupriseRAG:
         """
         k = k or self.config.retrieval_k
         retriever = self._get_retriever()
-        generator = self._get_generator()
 
         # Measure retrieval latency
         retrieval_start = time.perf_counter()
         retrieval_results = retriever.search(question, k=k)
         retrieval_latency = time.perf_counter() - retrieval_start
+
+        # Verified mode: no LLM on the factual path; values are copied.
+        if self.config.answer_mode == "verified":
+            from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
+            va = answer_verified(
+                question, retrieval_results,
+                min_score=self.config.min_retrieval_score,
+                template=self.config.answer_template or DEFAULT_TEMPLATE,
+            )
+            return RAGResult(
+                question=question,
+                answer=va.text,
+                retrieval_results=retrieval_results,
+                retrieval_latency=retrieval_latency,
+                total_latency=retrieval_latency,
+                aggregation_hint=looks_like_aggregation(question),
+                verified=not va.refused,
+                refused=va.refused,
+                ambiguous=va.ambiguous,
+            )
+
+        generator = self._get_generator()
 
         # Build context
         context = "\n\n".join(
@@ -582,15 +617,39 @@ ANSWER (based only on the records above):"""
 
         total_latency = retrieval_latency + generation_latency
 
+        ungrounded = check_grounding(gen_result.text, context, question)
+        answer = gen_result.text
+        blocked = None
+        verified = refused = ambiguous = False
+        if ungrounded:
+            # Hard gate: a generative answer with fabricated figures never
+            # ships. Replace it with the deterministic verified fallback.
+            from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
+            va = answer_verified(
+                question, retrieval_results,
+                min_score=self.config.min_retrieval_score,
+                template=self.config.answer_template or DEFAULT_TEMPLATE,
+            )
+            blocked = answer
+            answer = va.text
+            verified = not va.refused
+            refused = va.refused
+            ambiguous = va.ambiguous
+            ungrounded = []
+
         return RAGResult(
             question=question,
-            answer=gen_result.text,
+            answer=answer,
             retrieval_results=retrieval_results,
             retrieval_latency=retrieval_latency,
             generation_latency=generation_latency,
             total_latency=total_latency,
-            ungrounded_numbers=check_grounding(gen_result.text, context, question),
+            ungrounded_numbers=ungrounded,
             aggregation_hint=looks_like_aggregation(question),
+            verified=verified,
+            refused=refused,
+            ambiguous=ambiguous,
+            blocked_generation=blocked,
         )
 
     def chat(self, messages: List[Dict[str, str]]) -> str:

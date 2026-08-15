@@ -53,12 +53,15 @@ class TestGrounding:
         """List markers and small counts are not treated as figures."""
         assert check_grounding("1. First point. 2. Second point.", SOURCES) == []
 
-    def test_end_to_end_result_carries_grounding(self):
-        rag = SoupriseRAG(RAGConfig(retriever="simple"))
+    def test_end_to_end_fabrication_is_blocked(self):
+        """The generative gate replaces answers with ungrounded figures."""
+        rag = SoupriseRAG(RAGConfig(retriever="simple", answer_mode="generative"))
         rag.generator = EchoGenerator(reply="The total is $99,999.99.")
         rag.index_from_entries([{"id": "A", "text": SOURCES}])
         result = rag.query("What does ACME owe?")
-        assert result.ungrounded_numbers == ["99999.99"]
+        assert result.blocked_generation == "The total is $99,999.99."
+        assert "$99,999.99" not in result.answer
+        assert result.ungrounded_numbers == []
 
 
 class TestAggregationHint:
@@ -73,7 +76,7 @@ class TestAggregationHint:
         assert looks_like_aggregation(question) is expected
 
     def test_end_to_end_hint(self):
-        rag = SoupriseRAG(RAGConfig(retriever="simple"))
+        rag = SoupriseRAG(RAGConfig(retriever="simple", answer_mode="generative"))
         rag.generator = EchoGenerator()
         rag.index_from_entries([{"id": "A", "text": SOURCES}])
         assert rag.query("What is the total of all invoices?").aggregation_hint
@@ -126,7 +129,7 @@ class TestUpsertDelete:
 
 class TestMultiTurnHistory:
     def test_chat_includes_history_in_prompt(self):
-        rag = SoupriseRAG(RAGConfig(retriever="simple"))
+        rag = SoupriseRAG(RAGConfig(retriever="simple", answer_mode="generative"))
         gen = EchoGenerator()
         rag.generator = gen
         rag.index_from_entries([{"id": "A", "text": SOURCES}])
@@ -140,7 +143,7 @@ class TestMultiTurnHistory:
         assert "QUESTION: And how much is it?" in gen.last_prompt
 
     def test_single_turn_has_no_history_block(self):
-        rag = SoupriseRAG(RAGConfig(retriever="simple"))
+        rag = SoupriseRAG(RAGConfig(retriever="simple", answer_mode="generative"))
         gen = EchoGenerator()
         rag.generator = gen
         rag.index_from_entries([{"id": "A", "text": SOURCES}])
@@ -171,7 +174,7 @@ class TestChatTemplateWrapping:
 
 class TestInjectionDelimiting:
     def test_records_marked_as_data(self):
-        rag = SoupriseRAG(RAGConfig(retriever="simple"))
+        rag = SoupriseRAG(RAGConfig(retriever="simple", answer_mode="generative"))
         gen = EchoGenerator()
         rag.generator = gen
         rag.index_from_entries([

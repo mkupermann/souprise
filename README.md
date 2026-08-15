@@ -59,7 +59,20 @@ Souprise answers from your records, so the useful questions are the ones your te
 
 Three honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data works today through `souprise index build` with CSV, Excel, JSONL or a PostgreSQL query (see [Persistent Indexes and Connectors](#persistent-indexes-and-connectors)). Native SAP and DATEV integration is a roadmap item (v0.3), not a current feature.
 
-Third, and this one matters: **Souprise answers point lookups, not aggregates.** "Which invoices for ACME are overdue" works, because the relevant records fit into the retrieved context. "What is the total of all overdue invoices" does not, because top-k retrieval only ever sees k records; sums, averages and counts across the corpus belong in a database query. The chat surfaces a hint when a question looks aggregate-shaped, and every answer runs a mechanical grounding check: any figure in the answer that appears in none of the retrieved records is flagged as a fabrication risk.
+Third, and this one matters: **Souprise answers point lookups, not aggregates.** "Which invoices for ACME are overdue" works, because the relevant records fit into the retrieved context. "What is the total of all overdue invoices" does not, because top-k retrieval only ever sees k records; sums, averages and counts across the corpus belong in a database query. The chat surfaces a hint when a question looks aggregate-shaped.
+
+## Verified Answers
+
+Fabricated figures can't be reliably suppressed inside a language model, so the default mode takes the model off the factual path entirely. In **verified mode**, a rule-based detector maps your question to a record field and the value is **copied verbatim from the record, never generated**. If the question names an entity the corpus doesn't have, Souprise refuses instead of returning the closest lookalike. If multiple records of the same entity disagree, you get all candidate values listed, not a guess. No model is even loaded, which also makes it fast.
+
+Measured against the pre-registered BENCH-5 bars ([report](benchmarks/results/verified_report.md)): value accuracy **1.000** on 60 lookups, wrong-value rate **0.000** under entity ambiguity, refusal rate **1.000** on unknown entities. The generative mode stays available with `--mode generative` and sits behind a hard gate: an answer containing any figure not present in the retrieved records is replaced by the verified fallback before it ships — measured shipped-fabrication rate with the real local model: **0.000**.
+
+```bash
+souprise chat query "What is the amount of the invoice for Customer_0042?"   # verified, default
+souprise chat query "Summarize Customer_0042's situation" --mode generative  # gated LLM
+```
+
+Precisely stated: verified answers guarantee that every value comes verbatim from a cited record. They do not guarantee the record itself is right — keep one current record per entity, and Souprise repeats your data faithfully.
 
 ## Design Principles
 

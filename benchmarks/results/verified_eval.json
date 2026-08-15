@@ -1,0 +1,18 @@
+{
+  "v1_value_accuracy_deduped": 1.0,
+  "v2_wrong_value_rate_ambiguous": 0.0,
+  "v3_refusal_rate_unknown": 1.0,
+  "bars": {
+    "v1": "= 1.000",
+    "v2": "= 0.000",
+    "v3": "= 1.000",
+    "v4": "= 0.000"
+  },
+  "v4_shipped_ungrounded_rate": 0.0,
+  "verdicts": {
+    "v1": "pass",
+    "v2": "pass",
+    "v3": "pass",
+    "v4": "pass"
+  }
+}

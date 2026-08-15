@@ -31,6 +31,12 @@ def chat(
         "auto",
         help="Backend: 'auto' (detect), 'mlx' (Apple Silicon), 'torch' (CUDA/ROCm/CPU)"
     ),
+    mode: str = typer.Option(
+        "verified",
+        help="'verified': values copied from records, no LLM on the factual "
+             "path (default). 'generative': LLM answers behind a hard "
+             "grounding gate."
+    ),
     index: Optional[str] = typer.Option(
         None,
         help="Persistent index file built with 'souprise index build'. "
@@ -82,6 +88,7 @@ def chat(
         retrieval_k=retrieval_k,
         model_path=model,
         backend=resolved_backend,
+        answer_mode=mode,
         max_tokens=max_tokens,
         temperature=temperature
     )
@@ -98,15 +105,17 @@ def chat(
             console.print("[yellow]Generating synthetic business data...[/yellow]")
         rag.index_from_business_data(n=data_size, seed=42)
 
-    if verbose:
-        console.print(f"[yellow]Loading LLM model: {model}...[/yellow]")
-
-    # Load model
-    try:
-        rag.load_model()
-    except Exception as e:
-        console.print(f"[red]Error loading model: {e}[/red]")
-        raise typer.Exit(1)
+    if mode == "generative":
+        if verbose:
+            console.print(f"[yellow]Loading LLM model: {model}...[/yellow]")
+        try:
+            rag.load_model()
+        except Exception as e:
+            console.print(f"[red]Error loading model: {e}[/red]")
+            raise typer.Exit(1)
+    elif verbose:
+        console.print("[green]Verified mode: no model needed, "
+                      "values are copied from records.[/green]")
 
     console.print("[green]Ready! Type your questions (Ctrl+C to exit)[/green]")
     console.print()
@@ -126,6 +135,16 @@ def chat(
                 # Print answer
                 console.print("[bold green]Answer:[/bold green]")
                 console.print(result.answer)
+                if result.verified:
+                    console.print("[green]Verified: every value above is "
+                                  "copied from the cited records.[/green]")
+                if result.refused:
+                    console.print("[yellow]No sufficiently matching record; "
+                                  "refusing beats guessing.[/yellow]")
+                if result.blocked_generation:
+                    console.print("[red]A generated answer contained figures "
+                                  "not present in any record and was blocked; "
+                                  "showing the verified fallback.[/red]")
                 if result.ungrounded_numbers:
                     console.print(f"[red]Caution: these figures are not in the "
                                   f"retrieved records: "
@@ -157,6 +176,9 @@ def query(
     question: str = typer.Argument(..., help="The question to ask"),
     model: Optional[str] = typer.Option(None, help="Model path or ID"),
     backend: str = typer.Option("auto", help="Backend: 'auto', 'mlx', or 'torch'"),
+    mode: str = typer.Option("verified",
+                             help="'verified' (values copied from records) or "
+                                  "'generative' (LLM behind a grounding gate)"),
     index: Optional[str] = typer.Option(None, help="Persistent index file to load"),
     data_size: int = typer.Option(10000, help="Number of data entries (ignored with --index)"),
     retrieval_k: int = typer.Option(5, help="Number of retrieval results"),
@@ -170,7 +192,8 @@ def query(
     config = RAGConfig(
         retrieval_k=retrieval_k,
         model_path=model or DEFAULT_MODELS[resolved_backend],
-        backend=resolved_backend
+        backend=resolved_backend,
+        answer_mode=mode
     )
     rag = SoupriseRAG(config=config)
     if index:
@@ -178,7 +201,8 @@ def query(
         rag.retriever = SimpleHDCRetriever.load(index)
     else:
         rag.index_from_business_data(n=data_size, seed=42)
-    rag.load_model()
+    if mode == "generative":
+        rag.load_model()
 
     # Execute query
     result = rag.query(question)
@@ -186,6 +210,15 @@ def query(
     # Print result
     console.print(f"[bold blue]Question:[/bold blue] {question}")
     console.print(f"[bold green]Answer:[/bold green] {result.answer}")
+    if result.verified:
+        console.print("[green]Verified: every value above is copied from "
+                      "the cited records.[/green]")
+    if result.refused:
+        console.print("[yellow]No sufficiently matching record; refusing "
+                      "beats guessing.[/yellow]")
+    if result.blocked_generation:
+        console.print("[red]A generated answer contained ungrounded figures "
+                      "and was blocked; showing the verified fallback.[/red]")
     if result.ungrounded_numbers:
         console.print(f"[red]Caution: these figures are not in the retrieved "
                       f"records: {', '.join(result.ungrounded_numbers)}[/red]")

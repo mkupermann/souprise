@@ -35,7 +35,7 @@ class EchoGenerator(BaseGenerator):
 
 
 def build_pipeline():
-    rag = SoupriseRAG(RAGConfig(retriever="simple", retrieval_k=3))
+    rag = SoupriseRAG(RAGConfig(retriever="simple", retrieval_k=3, answer_mode="generative"))
     rag.generator = EchoGenerator()
     rag.index_from_business_data(n=300, seed=42)
     return rag
