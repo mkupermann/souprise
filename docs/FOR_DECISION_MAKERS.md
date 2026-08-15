@@ -22,7 +22,8 @@ We won't invent an ROI percentage for you. The structural argument is simple eno
 ## What it can't do yet, stated plainly
 
 - It is alpha software, version 0.2. Solid test coverage and honest recordings, but not a hardened product with support contracts.
-- Local models are smaller than the biggest cloud models. For focused questions over your records they work well, and every answer shows its sources so wrong answers are catchable. For open-ended reasoning, cloud models are still ahead.
+- It answers point lookups, not aggregates. "Which invoices for ACME are overdue" works. "Total of all overdue invoices" is a database question and Souprise says so instead of guessing.
+- Local models are smaller than the biggest cloud models. For focused questions over your records they work well, every answer shows its sources, and a built-in check flags any figure in an answer that appears in none of the retrieved records. For open-ended reasoning, cloud models are still ahead.
 - SAP and DATEV connect today via CSV export. Native integration is on the roadmap, not in the product.
 - There is no user management or access control yet. Today it is a single-user tool per machine.
 

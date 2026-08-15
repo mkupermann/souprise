@@ -54,10 +54,12 @@ Souprise answers from your records, so the useful questions are the ones your te
 | Team | Questions that work against the shipped data model | Backed by |
 |---|---|---|
 | Sales | Which invoices for Customer_0123 are overdue? What did a customer order last quarter, and for how much? Which A-segment customers in the EU haven't been contacted since March? | Invoices, orders, customer profiles |
-| Marketing | Which products are trending down despite high stock? Which segments carry the most annual revenue per region? How is the marketing budget tracking against its allocation? | Products, segments, KPIs, budgets |
+| Marketing | Which products are trending down despite high stock? What segment and region is Customer_0042 in? How is the marketing budget for 2025 tracking against its allocation? | Products, segments, KPIs, budgets |
 | Service | Which enterprise customers sit on more than five open tickets? What's the fulfillment status of a customer's last order? Which departments miss their satisfaction targets? | Customer profiles, orders, KPIs |
 
-Two honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data works today through `souprise index build` with CSV, Excel, JSONL or a PostgreSQL query (see [Persistent Indexes and Connectors](#persistent-indexes-and-connectors)). Native SAP and DATEV integration is a roadmap item (v0.3), not a current feature.
+Three honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data works today through `souprise index build` with CSV, Excel, JSONL or a PostgreSQL query (see [Persistent Indexes and Connectors](#persistent-indexes-and-connectors)). Native SAP and DATEV integration is a roadmap item (v0.3), not a current feature.
+
+Third, and this one matters: **Souprise answers point lookups, not aggregates.** "Which invoices for ACME are overdue" works, because the relevant records fit into the retrieved context. "What is the total of all overdue invoices" does not, because top-k retrieval only ever sees k records; sums, averages and counts across the corpus belong in a database query. The chat surfaces a hint when a question looks aggregate-shaped, and every answer runs a mechanical grounding check: any figure in the answer that appears in none of the retrieved records is flagged as a fabrication risk.
 
 ## Design Principles
 
@@ -110,6 +112,17 @@ The built-in retriever doesn't stop at 10,000 records.
 # Measure on your own machine, any corpus size
 python benchmarks/retrieval_bench.py --n 100000 --queries 50
 ```
+
+### Measured against BM25
+
+Retrieval quality is benchmarked, not asserted. A pre-registered protocol ([benchmarks/PROTOCOL.md](benchmarks/PROTOCOL.md), bars committed before the run) pits the built-in retriever against a plain BM25 baseline on 200 paraphrased business lookups over 5,000 records.
+
+| System | Recall@5 | MRR@5 |
+|---|---|---|
+| Built-in HDC | 1.000 | 1.000 |
+| BM25 | 0.965 | 0.908 |
+
+Honest reading, spelled out in the [full report](benchmarks/results/recall_report.md): both systems sit near the ceiling because business lookups carry unique identifiers, so this shows HDC holds up on the lookup class Souprise targets. It does not measure identifier-free semantic search, where an embedding model would be expected to win. Rerun it yourself with `PYTHONPATH=. python3 benchmarks/recall_bench.py`.
 
 When an exact linear scan stops being fast enough for you, swap in the optional [JuiceHDC](https://github.com/mkupermann/JuiceHDC) engine with `pip install -e ".[juicehdc]"` and `RAGConfig(retriever="juicehdc")`. An HD-NSW approximate index is planned for v1.0.
 
