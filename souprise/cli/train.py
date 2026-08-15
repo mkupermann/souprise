@@ -120,6 +120,47 @@ output: ./souprise_model
 
 
 @app.command()
+def style(
+    glossary: str = typer.Option(
+        ..., help="CSV with columns generic,company mapping terms to your language"
+    ),
+    answer_template: str = typer.Option(
+        ..., help="Text file with {summary} (and optional {source}); its lines "
+                  "become the trained answer structure"
+    ),
+    output_path: str = typer.Option(
+        "style_training.jsonl", help="Path for the generated training data"
+    ),
+    n: int = typer.Option(1500, help="Number of training examples"),
+    seed: Optional[int] = typer.Option(
+        None, help="Data seed. Default draws a fresh random seed each run so "
+                   "record values cannot be stably memorized"
+    ),
+):
+    """Generate corporate-style training data: your language and form, random values.
+
+    Values in the generated records are randomized per run, so the tuned
+    model learns terminology and structure but cannot memorize stable facts.
+    Evaluate afterwards with benchmarks/style_eval.py (see
+    benchmarks/PROTOCOL.md, BENCH-4).
+
+    Example:
+        souprise train style --glossary examples/style/glossary_de.csv \\
+            --answer-template examples/style/answer_template_de.txt
+        souprise train create-config --data-path style_training.jsonl
+        soup train --config soup_config.yaml --yes
+    """
+    from souprise.data.style import write_style_training
+
+    count = write_style_training(glossary, answer_template, output_path,
+                                 n=n, seed=seed)
+    console.print(f"[green]Generated {count} style training examples "
+                  f"-> {output_path}[/green]")
+    console.print("Next: souprise train create-config --data-path "
+                  f"{output_path}, then soup train --config soup_config.yaml --yes")
+
+
+@app.command()
 def all(
     data_size: int = typer.Option(10000, help="Number of training examples"),
     model: Optional[str] = typer.Option(None, help="Base model (default: matches backend)"),

@@ -1,0 +1,9 @@
+generic,company
+invoice,Faktura
+customer,Geschäftspartner
+revenue,Umsatzerlös
+amount,Rechnungsbetrag
+order,Bestellvorgang
+status,Bearbeitungsstand
+stock,Lagerbestand
+product,Artikel

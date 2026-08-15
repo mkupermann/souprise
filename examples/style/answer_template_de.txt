@@ -1,0 +1,3 @@
+Kurzüberblick: {summary}
+Quelle im Datenbestand: {source}
+Für Rückfragen steht das Team Finanzbuchhaltung gern bereit.
