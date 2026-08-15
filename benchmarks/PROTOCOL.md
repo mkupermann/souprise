@@ -101,3 +101,31 @@ README repositions fine-tuning as an optional, measure-first experiment
 outside the core pitch, and docs gain a "when to fine-tune" section with
 the measured evidence. If S1 or S2 clears its bar, that scenario gets
 documented as the recommended use case. S3 findings are reported either way.
+
+## BENCH-4: Corporate style tuning (pre-registered)
+
+Written and committed before any run. The feature under test:
+`souprise train style` generates style training data from a company
+glossary (generic term -> company term) and an answer template (structure,
+salutations, sign-offs), filled with RANDOMIZED record values from a
+run-specific random seed so no real or stable figure can be memorized.
+
+**Eval (`benchmarks/style_eval.py`).** 60 point-lookup questions with
+retrieval context, tuned vs untuned, temperature 0, NO glossary or template
+hints in the prompt (the tuning must carry the style by itself). Metrics:
+- term_compliance: fraction of answers using at least one company glossary
+  term where its generic twin would apply.
+- format_compliance: fraction of answers matching the template structure
+  (required section markers present).
+- factual accuracy must not degrade: expected value still in the answer.
+
+**Locked bars.**
+- Style works iff (term_compliance tuned - untuned >= +0.20) AND
+  (format_compliance tuned - untuned >= +0.30).
+- Accuracy guard: tuned accuracy >= untuned accuracy - 0.05.
+- Memorization control: on no-context questions about training-run values,
+  tuned reproduction rate <= untuned + 0.02 (randomized values make stable
+  memorization impossible by construction; this verifies it).
+
+All four must hold for the feature to be documented as working; any miss
+is published as-is.
