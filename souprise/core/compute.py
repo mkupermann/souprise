@@ -17,14 +17,29 @@ from typing import Any, Dict, List, Optional
 _AGG_PATTERNS = [
     (r"\b(average|mean|durchschnitt)\b", "avg"),
     (r"\b(how many|count|number of|wie viele|anzahl)\b", "count"),
-    (r"\b(total|sum|summe|combined|insgesamt)\b", "sum"),
-    (r"\b(highest|largest|maximum|max|höchste)\b", "max"),
-    (r"\b(lowest|smallest|minimum|min|niedrigste)\b", "min"),
+    (r"\b(are there any|do we have any|gibt es)\b", "count"),
+    (r"\b(total|sum|summe|combined|insgesamt|owe)\b", "sum"),
+    (r"\b(highest|largest|biggest|maximum|max|höchste|größte)\b", "max"),
+    (r"\b(lowest|smallest|minimum|min|niedrigste|kleinste)\b", "min"),
 ]
+
+_TREND_WORDS = {
+    "negative": "declining", "declining": "declining", "down": "declining",
+    "falling": "declining", "rising": "rising", "positive": "rising",
+    "up": "rising", "stable": "stable",
+}
+
+_THRESHOLD_RE = re.compile(
+    r"(greater than|more than|over|above|exceeding|mehr als|über|"
+    r"less than|under|below|fewer than|weniger als|unter)\s+\$?([\d,]+(?:\.\d+)?)")
+_BELOW_WORDS = ("less than", "under", "below", "fewer than",
+                "weniger als", "unter")
 
 _FIELD_PATTERNS = [
     (r"annual revenue|revenue|umsatz", "Annual Revenue"),
-    (r"amount|betrag|invoices? (worth|value)|owed", "Amount"),
+    (r"amount|betrag|invoices? (worth|value)|owed?|owes", "Amount"),
+    (r"value of .*orders?|orders? .*value|order value", "Total"),
+    (r"open tickets|tickets", "Open Tickets"),
     (r"stock|lagerbestand|units", "Stock"),
     (r"price|preis", "Price"),
     (r"quantity|menge", "Quantity"),
@@ -68,6 +83,14 @@ def parse_aggregate(question: str):
         if re.search(rf"\b{status}\b", q):
             filters["Status"] = status
             break
+    for word, trend in _TREND_WORDS.items():
+        if re.search(rf"\b{word}\b.*\btrend\b|\btrend\b.*\b{word}\b", q):
+            filters["Trend"] = trend
+            break
+    threshold = _THRESHOLD_RE.search(q)
+    if threshold:
+        direction = "<" if threshold.group(1) in _BELOW_WORDS else ">"
+        filters["_threshold"] = f"{direction}{threshold.group(2).replace(',', '')}"
     for region in _REGION_WORDS:
         if re.search(rf"\b{region}\b(?! \w*_)", q) and f"{region} " not in ("us ",):
             filters["Region"] = region.upper() if len(region) <= 4 else region.capitalize()
@@ -94,6 +117,8 @@ def _to_decimal(raw: str) -> Optional[Decimal]:
 
 def _matches(entry_text: str, fields: Dict[str, str], filters: Dict[str, str]) -> bool:
     for key, wanted in filters.items():
+        if key == "_threshold":
+            continue  # applied to the target field's value, not here
         if key == "_entity":
             if wanted not in entry_text.lower():
                 return False
@@ -116,6 +141,7 @@ def compute_aggregate(question: str, entries: List[Dict[str, Any]]) -> Optional[
         return None
     operation, field_name, filters = parsed
 
+    threshold = filters.get("_threshold")
     values: List[Decimal] = []
     matched = 0
     for entry in entries:
@@ -129,9 +155,16 @@ def compute_aggregate(question: str, entries: List[Dict[str, Any]]) -> Optional[
         if raw is None:
             continue
         value = _to_decimal(raw)
-        if value is not None:
-            values.append(value)
-            matched += 1
+        if value is None:
+            continue
+        if threshold:
+            bound = Decimal(threshold[1:])
+            if threshold[0] == ">" and not value > bound:
+                continue
+            if threshold[0] == "<" and not value < bound:
+                continue
+        values.append(value)
+        matched += 1
 
     filter_text = ", ".join(
         f"{'entity' if k == '_entity' else k}={v}" for k, v in filters.items()
@@ -141,11 +174,19 @@ def compute_aggregate(question: str, entries: List[Dict[str, Any]]) -> Optional[
         result_value = str(matched)
         summary = f"Count of records ({filter_text}): {matched}"
     else:
-        if not values:
+        if not values and operation != "count":
             return ComputeResult(
                 text=(f"No records with a {field_name} value match "
                       f"({filter_text}); nothing to compute."),
                 operation=operation, field_name=field_name,
+                record_count=0, filters=filters,
+            )
+        if not values:  # a count of zero is a valid, exact answer
+            return ComputeResult(
+                text=(f"count of {field_name} over 0 records "
+                      f"({filter_text}): 0\nComputed deterministically from "
+                      f"the index; no language model involved."),
+                operation=operation, field_name=field_name, value="0",
                 record_count=0, filters=filters,
             )
         if operation == "sum":

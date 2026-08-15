@@ -55,6 +55,20 @@ class TestComputeAggregate:
         assert result.value == "100.00"
         assert result.record_count == 1
 
+    def test_threshold_filter(self):
+        result = compute_aggregate(
+            "How many invoices have an amount greater than 100?", ENTRIES)
+        assert result.value == "1"  # only $250.50 is > 100
+
+    def test_existence_question_is_a_count(self):
+        result = compute_aggregate(
+            "Are there any invoices with an amount over 1000?", ENTRIES)
+        assert result.value == "0"
+
+    def test_max_with_entity(self):
+        result = compute_aggregate("largest invoice amount for B_02?", ENTRIES)
+        assert result.value == "250.50"
+
     def test_no_matches_is_explicit(self):
         result = compute_aggregate("total amount of all cancelled invoices?",
                                    ENTRIES)

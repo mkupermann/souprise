@@ -71,6 +71,39 @@ class TestVerifiedAnswers:
         assert not va.refused
         assert va.values == ["$14,762.19"]
 
+    def test_natural_name_known_entity_answers(self):
+        record = _result("Invoice ACME GmbH 2026-01",
+                         "Customer: ACME GmbH\nAmount: $5,000.00\nStatus: paid")
+        va = answer_verified("What is the amount for ACME GmbH?", [record],
+                             vocabulary={"acme gmbh"})
+        assert not va.refused
+        assert va.values == ["$5,000.00"]
+
+    def test_natural_name_unknown_company_refuses(self):
+        record = _result("Invoice ACME GmbH 2026-01",
+                         "Customer: ACME GmbH\nAmount: $5,000.00\nStatus: paid")
+        va = answer_verified("What is the amount for Zorblatt Industries Inc.?",
+                             [record], vocabulary={"acme gmbh"})
+        assert va.refused
+
+    def test_record_intent_path(self):
+        va = answer_verified("Can you pull up the profile for ACME_01?",
+                             [INVOICE])
+        assert va.path == "record_intent"
+        assert "Amount: $14,762.19" in va.text
+
+    def test_entity_scan_finds_missed_entity(self):
+        """A named entity absent from top-k is found via the full scan."""
+        other = _result("Invoice OTHER_99 Jan 2024",
+                        "Customer: OTHER_99\nAmount: $1.00", 0.60)
+        entries = [{"id": "Invoice RARE_77 Feb 2024",
+                    "text": "Invoice RARE_77 Feb 2024\nCustomer: RARE_77\n"
+                            "Amount: $321.00\nStatus: open"}]
+        va = answer_verified("What is the amount for RARE_77?", [other],
+                             all_entries=entries)
+        assert not va.refused
+        assert va.values == ["$321.00"]
+
     def test_custom_template(self):
         va = answer_verified("What is the amount?", [INVOICE],
                              template="Kurzüberblick: {summary}\nQuelle: {source}")

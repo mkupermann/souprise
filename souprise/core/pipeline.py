@@ -57,6 +57,9 @@ class RAGResult:
     verified: bool = False
     # The answer is a deterministic aggregate computed over all entries.
     computed: bool = False
+    # Route that produced the deterministic answer: "computed", "field",
+    # "ambiguous", "record", "record_intent", "refusal", or "" (generative).
+    answer_path: str = ""
     # The system declined to answer (no/weak retrieval match).
     refused: bool = False
     # Conflicting records for the same entity; all candidates are listed.
@@ -578,6 +581,7 @@ class SoupriseRAG:
                 computed=deterministic["computed"],
                 refused=deterministic["refused"],
                 ambiguous=deterministic["ambiguous"],
+                answer_path=deterministic["path"],
             )
             if self.config.answer_mode == "styled" and not result.refused:
                 self._verbalize(result)
@@ -661,24 +665,42 @@ ANSWER (based only on the records above):"""
         retriever = self._get_retriever()
         return getattr(retriever, "_entries", None) or self._entries
 
+    def _entity_vocabulary(self) -> set:
+        """Cached entity vocabulary of the current index."""
+        from souprise.core.verified import known_entities
+        entries = self._all_entries()
+        cache = getattr(self, "_vocab_cache", None)
+        if cache and cache[0] == len(entries):
+            return cache[1]
+        vocabulary = known_entities(entries)
+        self._vocab_cache = (len(entries), vocabulary)
+        return vocabulary
+
     def _deterministic_answer(self, question, retrieval_results) -> Dict[str, Any]:
         """Verified lookup or computed aggregate; code owns every figure."""
         from souprise.core.compute import compute_aggregate
         from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
 
-        if looks_like_aggregation(question):
-            computed = compute_aggregate(question, self._all_entries())
-            if computed is not None:
-                return {"text": computed.text, "verified": True,
-                        "computed": True, "refused": False, "ambiguous": False}
+        # Always try the deterministic computation first; parse_aggregate
+        # returns None for non-aggregate questions. (The former
+        # looks_like_aggregation pre-gate used a narrower marker list and
+        # silently skipped computable questions like "largest order".)
+        computed = compute_aggregate(question, self._all_entries())
+        if computed is not None:
+            return {"text": computed.text, "verified": True,
+                    "computed": True, "refused": False,
+                    "ambiguous": False, "path": "computed"}
 
         va = answer_verified(
             question, retrieval_results,
             min_score=self.config.min_retrieval_score,
             template=self.config.answer_template or DEFAULT_TEMPLATE,
+            all_entries=self._all_entries(),
+            vocabulary=self._entity_vocabulary(),
         )
         return {"text": va.text, "verified": not va.refused, "computed": False,
-                "refused": va.refused, "ambiguous": va.ambiguous}
+                "refused": va.refused, "ambiguous": va.ambiguous,
+                "path": va.path}
 
     def _verbalize(self, result: RAGResult) -> None:
         """Have the LLM phrase the deterministic answer, behind an exact

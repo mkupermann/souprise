@@ -1,0 +1,202 @@
+{
+  "answerable": 31,
+  "covered": 31,
+  "coverage": 1.0,
+  "wrong_values": 0,
+  "bars": {
+    "coverage": ">= 0.85",
+    "wrong_values": "= 0"
+  },
+  "verdicts": {
+    "coverage": "pass",
+    "wrong_values": "pass"
+  },
+  "rows": [
+    {
+      "question": "How much does Customer_0123 owe in total?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the total overdue amount across all customers?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "How many invoices are overdue for Customer_0345?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the value of Customer_0789's largest invoice?",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Show me the order details for Product_AB",
+      "path": "record_intent",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the total value of all orders from Customer_0345?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Are there any orders with quantity greater than 50?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the status of Customer_0567's largest order?",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is Customer_0042's annual revenue?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Who is the contact person for Customer_0123?",
+      "path": "ambiguous",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "How many open tickets does Customer_0567 currently have?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Are there any customers with more than 5 open tickets?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the contact email for Customer_0987?",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the current stock level for Product_AB?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the margin percentage for Product_XY?",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Is Product_CD currently trending up or down?",
+      "path": "ambiguous",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the average margin across our entire product catalog?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the price of Product_EF?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Are there any products with a negative sales trend?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the allocated budget for the marketing department?",
+      "path": "ambiguous",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the remaining budget for the IT department?",
+      "path": "ambiguous",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the total allocated budget across all departments?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Can you pull up the profile for Customer_0123?",
+      "path": "record_intent",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Do we have any overdue invoices from Customer_0789?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "How is Product_XY performing in terms of sales?",
+      "path": "record_intent",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "What is the current budget status for the HR department?",
+      "path": "record_intent",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Show me the largest order from Customer_0345",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Are there any products with a negative sales trend?",
+      "path": "computed",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Can you summarize Customer_0567's open invoices for me?",
+      "path": "correct_refusal",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Was ist der Status der Rechnung f\u00fcr Customer_0042?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    },
+    {
+      "question": "Wie hoch ist der Jahresumsatz von Customer_0123?",
+      "path": "field",
+      "covered": true,
+      "reference_ok": true
+    }
+  ]
+}
