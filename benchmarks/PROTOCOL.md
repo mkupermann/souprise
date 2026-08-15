@@ -225,3 +225,31 @@ Candidate encoder alongside v1. Locked adoption rule:
 If v2 loses anywhere, v1 stays default, v2 stays opt-in, and the loss is
 published. Index metadata records the encoding version; loading an index
 with a mismatched encoding version fails loudly (reproducibility).
+
+## BENCH-9: Index-side RBAC and audit trail (pre-registered)
+
+Written and committed before implementation.
+
+**R1 leak test.** With a policy restricting visibility (e.g. Region=EU)
+active, run 200 mixed queries. Bars, all = 0 occurrences:
+- no forbidden record's id, content or score appears in any RAGResult
+  field (answer, sources, retrieval_results) — the mask applies BEFORE
+  distance computation, so scores over forbidden records never exist
+- no hidden field's value (field mask, e.g. Margin) appears in any
+  answer, record dump, or generative context
+Known, documented non-goal: timing side channels are out of scope.
+
+**R2 correctness under policy.** Value accuracy 1.000 on 60 lookups
+whose targets are visible; questions targeting forbidden records or
+hidden fields yield an explicit policy denial or refusal at rate 1.000,
+never a value.
+
+**A1 audit completeness.** With auditing enabled, N queries produce
+exactly N append-only events, each carrying question, route, record ids
+with content hashes, an answer hash that matches the shipped answer, and
+latencies. UPDATE and DELETE on the audit table must fail (enforced by
+trigger). Refusals and denials are logged like answers.
+
+All bars must hold; results are published as measured. Honest scope
+note: policies are enforcement objects in-process; user authentication
+arrives with the REST API (#29).
