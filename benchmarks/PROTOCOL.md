@@ -153,3 +153,22 @@ all candidates; retrieval below a score threshold must refuse.
   Bar: shipped ungrounded-figure rate = 0.000.
 
 All four bars must hold; results are published as measured either way.
+
+## BENCH-6: Deterministic computation and LLM-as-verbalizer (pre-registered)
+
+Written and committed before implementation.
+
+**C1 computation exactness.** 40 aggregate questions (sum/count/average/
+min/max of Amount/Stock/Annual Revenue, filtered by status, customer or
+region) over the 2,000-record corpus (seed 123). Ground truth computed
+independently in the test from the raw entries. Bar: exact match rate
+= 1.000 (Decimal arithmetic; string-identical after normalization).
+
+**C2 verbalizer gate.** 60 verified lookups plus 20 computed aggregates
+run through the styled mode with the real 0.5B model phrasing the answer.
+Every figure in the shipped text must exactly match the deterministic
+values or the question. Bar: shipped mismatch rate = 0.000 (mismatches
+must fall back to the deterministic text; fallback rate is reported but
+has no bar — honesty over beauty).
+
+Both bars must hold; results are published as measured.
