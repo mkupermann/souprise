@@ -63,6 +63,28 @@ class TestPersistence:
         with pytest.raises(Exception):
             SimpleHDCRetriever.load(str(tmp_path / "missing.db"))
 
+    def test_daily_append_roundtrip(self, tmp_path):
+        """Load, append a delta, save. Only the delta is encoded and the
+        new records are searchable immediately."""
+        path = str(tmp_path / "index.db")
+        retriever = SimpleHDCRetriever()
+        retriever.index([
+            {"id": "OLD-1", "text": "Invoice ACME January status paid"},
+        ])
+        retriever.save(path)
+
+        updated = SimpleHDCRetriever.load(path)
+        updated.add([
+            {"id": "NEW-1", "text": "Invoice Umbrella February status overdue",
+             "metadata": {"tags": ["overdue"]}},
+        ])
+        updated.save(path)
+
+        final = SimpleHDCRetriever.load(path)
+        assert final.size == 2
+        assert final.search("overdue Umbrella invoice", k=1)[0].title == "NEW-1"
+        assert final.search("paid ACME invoice", k=1)[0].title == "OLD-1"
+
 
 class TestCSVImporter:
     def _write_csv(self, tmp_path, delimiter=","):

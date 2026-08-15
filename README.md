@@ -147,6 +147,23 @@ souprise chat --index souprise_index.db --model ./souprise_model
 
 The same works in code through `souprise.data.importers` (`load_csv`, `load_excel`, `load_jsonl`, `load_postgres`) and `SimpleHDCRetriever.save(path)` / `SimpleHDCRetriever.load(path)`. Rows are rendered as plain "Column: value" text, the same shape the synthetic generators produce, so a model fine-tuned on the synthetic data feels at home with your real records. The Postgres path is covered by a round-trip test against a real database in CI.
 
+### Daily updates, no retraining
+
+New data does not mean new training. The facts live in the index, not in the model's weights, so appending today's records makes them answerable immediately. `souprise index add` loads the existing index, encodes only the delta (around 2,000 entries per second), and saves. A thousand new invoices land in about a second.
+
+```bash
+# Nightly job: append today's records to the standing index
+souprise index add --path souprise_index.db \
+    --from-postgres postgresql://user@localhost/erp \
+    --query "SELECT id, customer, amount, status FROM invoices WHERE created_at::date = CURRENT_DATE" \
+    --id-column id
+
+# Or from a daily export
+souprise index add --path souprise_index.db --from-csv todays_invoices.csv --id-column invoice_id
+```
+
+The fine-tuned model only needs retraining when the shape of your data changes, new record types or new fields, not when new rows arrive. Day-to-day freshness is an index append, and the append is covered by the test suite.
+
 ## Installation
 
 ```bash
@@ -266,6 +283,7 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 | `souprise train create-config` | Write a Soup fine-tuning configuration |
 | `souprise train all` | Data and configuration in one step |
 | `souprise index build` | Build a persistent index from CSV, Excel, JSONL, PostgreSQL, or synthetic data |
+| `souprise index add` | Append new records to an existing index, encoding only the delta |
 | `souprise index info` | Show statistics of a persistent index |
 | `souprise index query "<question>"` | Search a persistent index without loading an LLM |
 | `souprise info` | Show installed backends and versions |
