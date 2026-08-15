@@ -20,7 +20,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from souprise.core.hdc import SimpleHDCRetriever, _tokenize
+from souprise.core.hdc import SimpleHDCRetriever
 from souprise.data.generators.business import generate_business_data
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
