@@ -1,0 +1,9 @@
+{
+  "questions": 60,
+  "corpus": 2000,
+  "untuned_accuracy": 0.7333,
+  "tuned_accuracy": 0.7167,
+  "delta": -0.0167,
+  "bar": "adds value iff delta >= +0.05",
+  "verdict": "no_measurable_benefit"
+}

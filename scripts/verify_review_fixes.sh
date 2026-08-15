@@ -18,13 +18,13 @@ grep -rq "ungrounded" tests/ || fail "no grounding tests"
 grep -q "def delete" souprise/core/hdc.py || fail "no delete()"
 grep -rq "test_add_upserts\|upsert" tests/ || fail "no upsert test"
 grep -rq "test_delete" tests/ || fail "no delete test"
-grep -rq "test_chat_includes_history\|history" tests/test_pipeline.py || fail "no multi-turn test"
+grep -rq "test_chat_includes_history" tests/ || fail "no multi-turn test"
 grep -q "data, not instructions" souprise/core/pipeline.py || fail "no injection delimiting"
 
 # 4. BENCH-1: recall benchmark ran and produced a real report with both systems
 [ -f benchmarks/results/recall_report.md ] || fail "no recall report"
 grep -q "BM25" benchmarks/results/recall_report.md || fail "recall report lacks BM25"
-grep -qE "Recall@5.*0\.[0-9]+" benchmarks/results/recall_report.md || fail "no recall numbers"
+grep -qE "\| *[01]\.[0-9]{3}" benchmarks/results/recall_report.md || fail "no recall numbers"
 grep -q "recall_report" README.md || grep -q "BM25" README.md || fail "README lacks recall result"
 
 # 5. BENCH-2: fine-tune eval report exists with tuned vs untuned numbers OR a

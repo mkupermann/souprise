@@ -307,8 +307,10 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 
 1. `souprise train generate` writes synthetic Q&A pairs as Alpaca JSONL. Your own data works in the same format.
 2. `souprise train create-config` writes `soup_config.yaml`. Defaults are LoRA `r=16, alpha=32, dropout=0.05`, 4-bit quantization, 3 epochs, learning rate `2e-5`, 10 % validation split.
-3. `soup train --config soup_config.yaml` fine-tunes the base model locally and produces `./souprise_model`.
+3. `soup train --config soup_config.yaml --yes` fine-tunes the base model locally and produces `./souprise_model`.
 4. `souprise chat --model ./souprise_model` runs RAG over your data with the tuned model, fully offline.
+
+**Measured, honestly: you may not need this step.** We ran the whole path for real (Soup/LoRA, 2,600 iterations on 3,883 synthetic examples) and evaluated tuned against untuned on 60 point lookups with identical retrieval context, per the pre-registered bars in [benchmarks/PROTOCOL.md](benchmarks/PROTOCOL.md). Result: untuned 0.733, tuned 0.717, verdict "no measurable benefit" at this scale — retrieval does the factual work, and the untuned instruct model reads the provided records just as well ([full report](benchmarks/results/finetune_report.md)). Fine-tuning stays available for real domain vocabulary or larger models; measure before assuming it helps.
 
 ## CLI Reference
 
