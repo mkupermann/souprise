@@ -1,0 +1,19 @@
+{
+  "r1_leaks": 0,
+  "r2_visible_accuracy": 1.0,
+  "r2_forbidden_denial_rate": 1.0,
+  "a1_complete": true,
+  "a1_hash_match": true,
+  "a1_immutable": true,
+  "bars": {
+    "r1": "= 0",
+    "r2_visible": "= 1.000",
+    "r2_forbidden": "= 1.000",
+    "a1": "all true"
+  },
+  "verdicts": {
+    "r1": "pass",
+    "r2": "pass",
+    "a1": "pass"
+  }
+}

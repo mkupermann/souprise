@@ -25,7 +25,7 @@ Every design decision passes this test. If a feature endangers correctness even 
 2. **Refusal beats guessing.** Unknown entities and weak retrieval get an explicit refusal, never the closest lookalike. Measured refusal rate on unknown entities: **1.000**; wrong values under conflicting records: **0.000** (all candidates are listed instead).
 3. **A hard gate on the generative mode.** Opting into LLM answers puts every figure through a grounding gate; anything not present in the retrieved records is replaced by the verified fallback before it ships. Measured shipped-fabrication rate: **0.000**.
 
-Stated just as openly: **role-based access control is not built yet.** Today Souprise is a single-user tool per machine — everyone with access sees the whole index. Record-level permissions filtered *before* search (RBAC) are the next security milestone on the [roadmap](#project-status) (v0.3, tracked in [#16](https://github.com/mkupermann/souprise/issues/16)); the deterministic architecture is built for it, since a permission mask over the index is exact code, not a model decision.
+Access control follows the same rule. **Record-level permissions are enforced before search**: a role's visibility mask is applied to the hypervector index before any distance is computed, so similarity scores over forbidden records never exist and cannot leak through ranking or answers. Field masks strip hidden values (a margin column, say) from answers, record dumps and aggregations, and an append-only audit log records every query with record hashes and an answer hash, immutability enforced by the database itself. Measured against pre-registered bars: **0 leaks across 200 policy queries, denial rate 1.000 on forbidden targets** ([RBAC report](benchmarks/results/rbac_report.md)). Pass a JSON policy with `--policy` and a log path with `--audit`. The honest limit: policies are in-process objects — user authentication and principal management arrive with the REST API (v0.3, [#29](https://github.com/mkupermann/souprise/issues/29)).
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="souprise demo, recorded live. System info, training data generation, Soup config, a 10,000-record retrieval benchmark, and a grounded answer from a local model." width="1000"><br>
@@ -108,6 +108,8 @@ Precisely stated: verified answers guarantee that every value comes verbatim fro
 </p>
 
 `backend="auto"` is the default and does what you'd expect. MLX where it exists, PyTorch everywhere else, plus a matching small base model unless you name one. Any Hugging Face causal LM works as `model_path`. Mistral, Llama, Qwen, Phi, or your own fine-tuned checkpoint. The shipped defaults were picked for download size, nothing else.
+
+Two honest notes on scope. Souprise is optimized for **small local models (0.5B to 7B parameters)** running on a single machine — the verified mode needs no model at all, and [our measurements](benchmarks/results/finetune_report.md) show a deduplicated corpus matters more than model size. If you need a 70B-class model, serve it yourself (vLLM or any OpenAI-compatible server on your own hardware) and plug it in as a custom `BaseGenerator`; a first-class integration is tracked in [#53](https://github.com/mkupermann/souprise/issues/53). And on dependencies: the core has none beyond NumPy, Typer and Rich. [Soup](https://github.com/makazhanAlpamys/soup) (fine-tuning) and [JuiceHDC](https://github.com/mkupermann/JuiceHDC) (alternative retrieval engine) are optional extras — if either project ever stops moving, Souprise keeps working, because the default retriever and the verified path live in this repository.
 
 ## Architecture
 
@@ -416,8 +418,8 @@ Alpha, v0.2.0. Pipeline, CLI, built-in retriever, data generators, persistent in
 |---|---|
 | v0.1 | Built-in HDC retrieval (tested to 25k+ records), auto-detected MLX/PyTorch generation, CLI, synthetic data generators, cross-platform CI, retrieval benchmark |
 | v0.2 (current) | Persistent SQLite indexes (`souprise index build/info/query`, `--index` in chat), CSV/Excel/JSONL importers, PostgreSQL connector with a real-database CI test |
-| v0.2.x | REST API, multi-turn chat, standardized benchmark suite |
-| v0.3 | SAP and DATEV integration, authentication and RBAC, multi-tenant |
+| v0.2.x | Multi-turn chat, standardized benchmark suite, index-side access policies (`--policy`) and append-only audit log (`--audit`, measured in [BENCH-9](benchmarks/results/rbac_report.md)); REST API in progress |
+| v0.3 | SAP and DATEV integration, authentication and principal management via REST API, multi-tenant |
 | v1.0 | Production deployment options, observability, HD-NSW approximate index for very large corpora |
 
 ## Ecosystem

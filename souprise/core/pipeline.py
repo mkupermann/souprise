@@ -67,6 +67,9 @@ class RAGResult:
     # In generative mode, an answer that failed the grounding gate is
     # replaced by the verified fallback; the blocked text is kept here.
     blocked_generation: Optional[str] = None
+    # Access policy applied to this query, and whether it denied the answer.
+    policy: str = "unrestricted"
+    policy_denied: bool = False
 
 
 _NUMBER_RE = re.compile(r"-?\$?\d[\d,]*(?:\.\d+)?")
@@ -173,6 +176,8 @@ class RAGConfig:
     answer_mode: str = "verified"
     min_retrieval_score: float = 0.52  # below this, verified mode refuses
     answer_template: Optional[str] = None  # verified-answer template override
+    policy: Optional[Any] = None  # AccessPolicy; None = unrestricted
+    audit_path: Optional[str] = None  # append-only audit log (SQLite)
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
@@ -547,6 +552,7 @@ class SoupriseRAG:
         question: str,
         k: Optional[int] = None,
         history: Optional[List[Dict[str, str]]] = None,
+        policy: Optional[Any] = None,
     ) -> RAGResult:
         """Execute a RAG query: retrieval + generation.
 
@@ -555,22 +561,51 @@ class SoupriseRAG:
             k: Number of retrieval results. Uses config.retrieval_k if None.
             history: Optional prior conversation turns ({'role', 'content'}
                 dicts); the last six are included in the prompt.
+            policy: AccessPolicy for this query; falls back to
+                config.policy, then unrestricted.
 
         Returns:
             RAGResult with answer, retrieval results, latencies, the
             grounding check, and an aggregation hint.
         """
+        from souprise.core.access import UNRESTRICTED
+
+        policy = policy or self.config.policy or UNRESTRICTED
+        result = self._query_scoped(question, k, history, policy)
+        result.policy = policy.name
+        if self.config.audit_path:
+            from souprise.core.audit import AuditLog
+            AuditLog(self.config.audit_path).record(result)
+        return result
+
+    def _query_scoped(self, question, k, history, policy) -> RAGResult:
+        from souprise.core.access import DENIAL_TEXT, redact_text
+
         k = k or self.config.retrieval_k
         retriever = self._get_retriever()
+        subset, scoped_entries = self._policy_scope(policy)
 
-        # Measure retrieval latency
+        # Field masks deny before any lookup: asking for a hidden field
+        # (as target or filter) never yields a value.
+        denied_field = self._policy_field_denial(question, policy)
+        if denied_field:
+            return RAGResult(question=question, answer=DENIAL_TEXT,
+                             refused=True, policy_denied=True,
+                             answer_path="policy_denial")
+
+        # Measure retrieval latency. The subset makes the mask apply
+        # BEFORE distance computation: forbidden rows never get a score.
         retrieval_start = time.perf_counter()
-        retrieval_results = retriever.search(question, k=k)
+        retrieval_results = retriever.search(question, k=k, subset=subset)
+        if policy.hidden_fields:
+            for r in retrieval_results:
+                r.content = redact_text(r.content, policy)
         retrieval_latency = time.perf_counter() - retrieval_start
 
         # Verified/styled modes: the factual core is deterministic.
         if self.config.answer_mode in ("verified", "styled"):
-            deterministic = self._deterministic_answer(question, retrieval_results)
+            deterministic = self._deterministic_answer(
+                question, retrieval_results, scoped_entries)
             result = RAGResult(
                 question=question,
                 answer=deterministic["text"],
@@ -639,6 +674,7 @@ ANSWER (based only on the records above):"""
                 question, retrieval_results,
                 min_score=self.config.min_retrieval_score,
                 template=self.config.answer_template or DEFAULT_TEMPLATE,
+                all_entries=scoped_entries,
             )
             blocked = answer
             answer = va.text
@@ -667,10 +703,44 @@ ANSWER (based only on the records above):"""
         retriever = self._get_retriever()
         return getattr(retriever, "_entries", None) or self._entries
 
-    def _entity_vocabulary(self) -> set:
-        """Cached entity vocabulary of the current index."""
-        from souprise.core.verified import known_entities
+    def _policy_scope(self, policy):
+        """(subset indices or None, visible+redacted entries), cached."""
+        from souprise.core.access import filter_entries, visible_mask
         entries = self._all_entries()
+        if policy.is_unrestricted:
+            return None, entries
+        cache = getattr(self, "_policy_cache", {})
+        key = (policy.name, len(entries))
+        if key not in cache:
+            import numpy as np
+            mask = visible_mask(entries, policy)
+            cache[key] = (np.flatnonzero(mask), filter_entries(entries, policy))
+            self._policy_cache = cache
+        return cache[key]
+
+    def _policy_field_denial(self, question: str, policy) -> bool:
+        """True if the question targets or filters on a hidden field."""
+        if not policy.hidden_fields:
+            return False
+        from souprise.core.compute import parse_aggregate
+        from souprise.core.verified import detect_field
+        hidden = {f.lower() for f in policy.hidden_fields}
+        target = detect_field(question)
+        if target and target.lower() in hidden:
+            return True
+        parsed = parse_aggregate(question)
+        if parsed:
+            _, agg_field, filters = parsed
+            if agg_field and agg_field.lower() in hidden:
+                return True
+            if any(f.lower() in hidden for f in filters if not f.startswith("_")):
+                return True
+        return False
+
+    def _entity_vocabulary(self, entries=None) -> set:
+        """Cached entity vocabulary of the (policy-scoped) index."""
+        from souprise.core.verified import known_entities
+        entries = entries if entries is not None else self._all_entries()
         cache = getattr(self, "_vocab_cache", None)
         if cache and cache[0] == len(entries):
             return cache[1]
@@ -678,16 +748,19 @@ ANSWER (based only on the records above):"""
         self._vocab_cache = (len(entries), vocabulary)
         return vocabulary
 
-    def _deterministic_answer(self, question, retrieval_results) -> Dict[str, Any]:
+    def _deterministic_answer(self, question, retrieval_results,
+                              entries=None) -> Dict[str, Any]:
         """Verified lookup or computed aggregate; code owns every figure."""
         from souprise.core.compute import compute_aggregate
         from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
+
+        entries = entries if entries is not None else self._all_entries()
 
         # Always try the deterministic computation first; parse_aggregate
         # returns None for non-aggregate questions. (The former
         # looks_like_aggregation pre-gate used a narrower marker list and
         # silently skipped computable questions like "largest order".)
-        computed = compute_aggregate(question, self._all_entries())
+        computed = compute_aggregate(question, entries)
         if computed is not None:
             return {"text": computed.text, "verified": True,
                     "computed": True, "refused": False,
@@ -697,8 +770,8 @@ ANSWER (based only on the records above):"""
             question, retrieval_results,
             min_score=self.config.min_retrieval_score,
             template=self.config.answer_template or DEFAULT_TEMPLATE,
-            all_entries=self._all_entries(),
-            vocabulary=self._entity_vocabulary(),
+            all_entries=entries,
+            vocabulary=self._entity_vocabulary(entries),
         )
         return {"text": va.text, "verified": not va.refused, "computed": False,
                 "refused": va.refused, "ambiguous": va.ambiguous,

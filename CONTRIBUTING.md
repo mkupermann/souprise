@@ -129,6 +129,25 @@ When reporting issues, please include:
 
 Major design decisions are documented in the README architecture section (if it exists). For new features, please open an issue to discuss the design before implementing.
 
+## AI-assisted development
+
+This project is developed with heavy use of AI tooling (Claude Code for
+implementation, review roundtables run through a second model vendor for
+independent critique). What that means in practice:
+
+- Code, tests and documentation may be AI-generated or AI-edited. Every
+  change is reviewed, executed and measured before it lands — the
+  pre-registered benchmark protocol in `benchmarks/PROTOCOL.md` exists
+  precisely so that no claim ships on plausibility alone.
+- Negative results are published (see the fine-tuning, sketch-prefilter
+  and encoding reports under `benchmarks/results/`), including when the
+  AI-proposed approach lost.
+- Bug reports found during development get a GitHub issue and are closed
+  by the fixing commit, so the history is auditable.
+
+If you contribute with AI assistance, the same bar applies: run it,
+measure it, and say what you measured.
+
 ## Maintainers
 
 - [Michael Kupermann](https://github.com/mkupermann)

@@ -37,7 +37,7 @@ _BELOW_WORDS = ("less than", "under", "below", "fewer than",
 
 _FIELD_PATTERNS = [
     (r"annual revenue|revenue|umsatz", "Annual Revenue"),
-    (r"amount|betrag|invoices? (worth|value)|owed?|owes", "Amount"),
+    (r"\b(amount|betrag|owed?|owes)\b|invoices? (worth|value)", "Amount"),
     (r"value of .*orders?|orders? .*value|order value", "Total"),
     (r"open tickets|tickets", "Open Tickets"),
     (r"stock|lagerbestand|units", "Stock"),
@@ -140,6 +140,13 @@ def compute_aggregate(question: str, entries: List[Dict[str, Any]]) -> Optional[
     if parsed is None:
         return None
     operation, field_name, filters = parsed
+
+    entity = filters.get("_entity")
+    if entity and not any(entity in e.get("text", "").lower() for e in entries):
+        # The entity does not exist in the (visible) index. A count of
+        # zero here would be misleading; fall through to the verified
+        # path, which refuses on unknown entities.
+        return None
 
     threshold = filters.get("_threshold")
     values: List[Decimal] = []

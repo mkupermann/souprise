@@ -271,14 +271,41 @@ class SimpleHDCRetriever(BaseRetriever):
                 p64[start:start + self.chunk_rows], q64)
         return distances
 
-    def search(self, query: str, k: int = 5) -> List[RetrievalResult]:
+    def search(self, query: str, k: int = 5,
+               subset: Optional[np.ndarray] = None) -> List[RetrievalResult]:
         """Return the top-k entries by hypervector similarity.
 
         Similarity is 1 - normalized Hamming distance, in [0, 1]. Top-k
         selection uses argpartition (O(n)) instead of a full sort.
+
+        Args:
+            subset: Optional array of row indices to search within. Used
+                for access policies: distances are computed only on these
+                rows, so scores over excluded records never exist.
         """
         if not self._entries:
             raise RuntimeError("Retriever not initialized. Call index() first.")
+
+        if subset is not None:
+            if len(subset) == 0:
+                return []
+            sub_packed = np.ascontiguousarray(self._packed[subset])
+            query_vec = self._encode(query)
+            distances = _popcount_rows(sub_packed.view(np.uint64),
+                                       query_vec.view(np.uint64))
+            k2 = min(k, len(subset))
+            order = np.argpartition(distances, k2 - 1)[:k2]
+            order = order[np.argsort(distances[order])]
+            results = []
+            for local in order:
+                entry = self._entries[int(subset[local])]
+                results.append(RetrievalResult(
+                    title=str(entry.get("id", int(subset[local]))),
+                    content=entry["text"],
+                    score=float(1.0 - distances[local] / DIMENSIONS),
+                    metadata=entry.get("metadata", {}) or {},
+                ))
+            return results
 
         query_vec = self._encode(query)
         n = len(self._entries)

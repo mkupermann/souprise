@@ -59,6 +59,16 @@ def chat(
         0.7,
         help="Temperature for LLM generation (0.0-1.0)"
     ),
+    policy: Optional[str] = typer.Option(
+        None,
+        help="JSON file with an access policy (visible_where conditions "
+             "and hidden_fields). Applied to the index before search."
+    ),
+    audit: Optional[str] = typer.Option(
+        None,
+        help="Path to an append-only SQLite audit log. Every query is "
+             "recorded with record hashes and an answer hash."
+    ),
     verbose: bool = typer.Option(
         False,
         help="Show verbose output"
@@ -91,10 +101,17 @@ def chat(
         backend=resolved_backend,
         answer_mode=mode,
         max_tokens=max_tokens,
-        temperature=temperature
+        temperature=temperature,
+        audit_path=audit
     )
 
     rag = SoupriseRAG(config=config)
+
+    active_policy = None
+    if policy:
+        from souprise.core.access import load_policy
+        active_policy = load_policy(policy)
+        console.print(f"[yellow]Access policy: {active_policy.name}[/yellow]")
 
     if index:
         from souprise.core.hdc import SimpleHDCRetriever
@@ -131,11 +148,14 @@ def chat(
                     continue
 
                 # Execute query
-                result = rag.query(query)
+                result = rag.query(query, policy=active_policy)
 
                 # Print answer
                 console.print("[bold green]Answer:[/bold green]")
                 console.print(result.answer)
+                if result.policy_denied:
+                    console.print("[yellow]Denied by your role's access "
+                                  "policy.[/yellow]")
                 if result.verified:
                     console.print("[green]Verified: every value above is "
                                   "copied from the cited records.[/green]")
@@ -184,6 +204,10 @@ def query(
     index: Optional[str] = typer.Option(None, help="Persistent index file to load"),
     data_size: int = typer.Option(10000, help="Number of data entries (ignored with --index)"),
     retrieval_k: int = typer.Option(5, help="Number of retrieval results"),
+    policy: Optional[str] = typer.Option(
+        None, help="JSON access policy file, applied before search"),
+    audit: Optional[str] = typer.Option(
+        None, help="Append-only SQLite audit log path"),
 ):
     """Ask a single question and get an answer.
 
@@ -195,9 +219,14 @@ def query(
         retrieval_k=retrieval_k,
         model_path=model or DEFAULT_MODELS[resolved_backend],
         backend=resolved_backend,
-        answer_mode=mode
+        answer_mode=mode,
+        audit_path=audit
     )
     rag = SoupriseRAG(config=config)
+    active_policy = None
+    if policy:
+        from souprise.core.access import load_policy
+        active_policy = load_policy(policy)
     if index:
         from souprise.core.hdc import SimpleHDCRetriever
         rag.retriever = SimpleHDCRetriever.load(index)
@@ -207,11 +236,13 @@ def query(
         rag.load_model()
 
     # Execute query
-    result = rag.query(question)
+    result = rag.query(question, policy=active_policy)
 
     # Print result
     console.print(f"[bold blue]Question:[/bold blue] {question}")
     console.print(f"[bold green]Answer:[/bold green] {result.answer}")
+    if result.policy_denied:
+        console.print("[yellow]Denied by your role's access policy.[/yellow]")
     if result.verified:
         console.print("[green]Verified: every value above is copied from "
                       "the cited records.[/green]")
