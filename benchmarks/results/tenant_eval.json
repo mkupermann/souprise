@@ -1,0 +1,17 @@
+{
+  "t1_cross_tenant_leaks": 0,
+  "t2_accuracy_acme": 1.0,
+  "t2_accuracy_globex": 1.0,
+  "t3_counts_separate": true,
+  "t3_immutable": true,
+  "bars": {
+    "t1": "= 0",
+    "t2": "= 1.000 each",
+    "t3": "all true"
+  },
+  "verdicts": {
+    "t1": "pass",
+    "t2": "pass",
+    "t3": "pass"
+  }
+}

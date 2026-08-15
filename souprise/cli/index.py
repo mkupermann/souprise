@@ -42,6 +42,11 @@ def build(
         None, help="Build from N synthetic business records instead of a file"
     ),
     seed: int = typer.Option(42, help="Seed for --synthetic"),
+    tenant: Optional[str] = typer.Option(
+        None, help="Write the index into this tenant's directory "
+                   "(creates the tenant if needed)"),
+    tenant_dir: str = typer.Option(
+        "tenants", help="Base directory holding all tenants"),
 ):
     """Build a persistent HDC index from CSV, Excel, JSONL, PostgreSQL, or synthetic data.
 
@@ -53,6 +58,14 @@ def build(
     """
     from souprise.core.hdc import SimpleHDCRetriever
     from souprise.data import importers
+
+    if tenant:
+        from souprise.core.tenants import TenantError, TenantManager
+        try:
+            output = TenantManager(tenant_dir).create(tenant).index_path
+        except TenantError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
 
     sources = [s for s in (from_csv, from_xlsx, from_jsonl, from_postgres, synthetic) if s]
     if len(sources) != 1:

@@ -98,6 +98,11 @@ def parse_aggregate(question: str):
     entity = _ENTITY_RE.search(question)
     if entity:
         filters["_entity"] = entity.group(0).lower()
+    if operation == "count" and field_name is not None and "_entity" in filters:
+        # "How many units of Product_X are in stock?" asks for the Stock
+        # VALUE of one entity, not for a record count. Field lookups
+        # belong to the verified path.
+        return None
     return operation, field_name, filters
 
 

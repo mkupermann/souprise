@@ -27,6 +27,8 @@ Every design decision passes this test. If a feature endangers correctness even 
 
 Access control follows the same rule. **Record-level permissions are enforced before search**: a role's visibility mask is applied to the hypervector index before any distance is computed, so similarity scores over forbidden records never exist and cannot leak through ranking or answers. Field masks strip hidden values (a margin column, say) from answers, record dumps and aggregations, and an append-only audit log records every query with record hashes and an answer hash, immutability enforced by the database itself. Measured against pre-registered bars: **0 leaks across 200 policy queries, denial rate 1.000 on forbidden targets** ([RBAC report](benchmarks/results/rbac_report.md)). Pass a JSON policy with `--policy` and a log path with `--audit`. The honest limit: policies are in-process objects — user authentication and principal management arrive with the REST API (v0.3, [#29](https://github.com/mkupermann/souprise/issues/29)).
 
+Serving several clients or subsidiaries from one installation follows the same logic, taken further. A tenant is not a filter but a directory: its own index file, its own audit log, its own policies (`souprise tenant create acme`, then `--tenant acme` on any command). A query only ever opens one tenant's files, so cross-tenant leakage would require reading a file the process never touches. Measured with colliding entity names across two tenants: **0 leaks in 200 queries, value accuracy 1.000 per tenant** ([tenant report](benchmarks/results/tenant_report.md)).
+
 ## For business readers
 
 If the paragraphs above sounded like engineering, this is the short version. Souprise is a very accurate search engine for your company data. Invoices, orders, customer records. You ask in plain language and get the answer in well under a second, with the source records attached.
@@ -34,7 +36,7 @@ If the paragraphs above sounded like engineering, this is the short version. Sou
 - **No invented numbers.** Every figure in an answer is copied from your records, never made up by an AI. When the data doesn't contain the answer, the tool says so instead of guessing. We measure this and publish the results.
 - **Your data stays in the house.** Everything runs on your own machine. No cloud, no account, no data leaves the building.
 - **Works with what you have.** Excel, CSV or a database connection. Tested with a million records answering in a tenth of a second.
-- **Access rights and an audit trail.** Roles see only their records, and every question and answer is logged in a tamper-proof journal.
+- **Access rights and an audit trail.** Roles see only their records, and every question and answer is logged in a tamper-proof journal. Several clients on one installation stay strictly separated.
 
 Think of it as a search engine for your business data that guarantees every number is real. The one-page [decision maker brief](docs/FOR_DECISION_MAKERS.md) has the cost argument and the honest limits. Or jump to the [quick start](#quick-start) and [the benchmarks](#retrieval-at-scale).
 
@@ -382,6 +384,7 @@ For anything else, measure before assuming tuning helps: `benchmarks/finetune_ev
 | `souprise index add` | Append new records to an existing index, encoding only the delta |
 | `souprise index info` | Show statistics of a persistent index |
 | `souprise index query "<question>"` | Search a persistent index without loading an LLM |
+| `souprise tenant create/list` | Manage physically isolated tenants (own index, audit log and policies each) |
 | `souprise gui` | Start the local web interface |
 | `souprise info` | Show installed backends and versions |
 | `souprise version` | Show version |
@@ -429,8 +432,8 @@ Alpha, v0.2.0. Pipeline, CLI, built-in retriever, data generators, persistent in
 |---|---|
 | v0.1 | Built-in HDC retrieval (tested to 25k+ records), auto-detected MLX/PyTorch generation, CLI, synthetic data generators, cross-platform CI, retrieval benchmark |
 | v0.2 (current) | Persistent SQLite indexes (`souprise index build/info/query`, `--index` in chat), CSV/Excel/JSONL importers, PostgreSQL connector with a real-database CI test |
-| v0.2.x | Multi-turn chat, standardized benchmark suite, index-side access policies (`--policy`) and append-only audit log (`--audit`, measured in [BENCH-9](benchmarks/results/rbac_report.md)); REST API in progress |
-| v0.3 | SAP and DATEV integration, authentication and principal management via REST API, multi-tenant |
+| v0.2.x | Multi-turn chat, standardized benchmark suite, index-side access policies (`--policy`) and append-only audit log (`--audit`, [BENCH-9](benchmarks/results/rbac_report.md)), physically isolated multi-tenancy (`--tenant`, [BENCH-10](benchmarks/results/tenant_report.md)); REST API in progress |
+| v0.3 | SAP and DATEV integration, authentication and principal management via REST API |
 | v1.0 | Production deployment options, observability, HD-NSW approximate index for very large corpora |
 
 ## Ecosystem

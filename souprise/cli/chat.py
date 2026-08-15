@@ -19,6 +19,30 @@ app = typer.Typer(help="Interactive chat with business data using RAG.")
 console = Console()
 
 
+def _resolve_tenant(tenant, tenant_dir, index, audit, policy):
+    """Map a tenant name onto its private index, audit log and policies.
+
+    Explicit --index/--audit paths still win; a bare --policy name is
+    looked up in the tenant's policies directory.
+    """
+    if not tenant:
+        return index, audit, policy
+    from pathlib import Path
+
+    from souprise.core.tenants import TenantError, TenantManager
+    try:
+        t = TenantManager(tenant_dir).get(tenant)
+    except TenantError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    index = index or t.index_path
+    audit = audit or t.audit_path
+    if policy and "/" not in policy and not Path(policy).exists():
+        policy = t.policy_path(policy.removesuffix(".json"))
+    console.print(f"[yellow]Tenant: {t.name}[/yellow]")
+    return index, audit, policy
+
+
 @app.callback(invoke_without_command=True)
 def chat(
     ctx: typer.Context,
@@ -69,6 +93,15 @@ def chat(
         help="Path to an append-only SQLite audit log. Every query is "
              "recorded with record hashes and an answer hash."
     ),
+    tenant: Optional[str] = typer.Option(
+        None,
+        help="Tenant name. Uses that tenant's own index, audit log and "
+             "policies; nothing is shared between tenants."
+    ),
+    tenant_dir: str = typer.Option(
+        "tenants",
+        help="Base directory holding all tenants"
+    ),
     verbose: bool = typer.Option(
         False,
         help="Show verbose output"
@@ -90,6 +123,7 @@ def chat(
 
     resolved_backend = resolve_backend(backend)
     model = model or DEFAULT_MODELS[resolved_backend]
+    index, audit, policy = _resolve_tenant(tenant, tenant_dir, index, audit, policy)
 
     if verbose:
         console.print(f"[yellow]Initializing RAG pipeline ({resolved_backend})...[/yellow]")
@@ -114,6 +148,12 @@ def chat(
         console.print(f"[yellow]Access policy: {active_policy.name}[/yellow]")
 
     if index:
+        from pathlib import Path as _Path
+        if tenant and not _Path(index).exists():
+            console.print(f"[red]Tenant '{tenant}' has no index yet. Build "
+                          f"one with 'souprise index build --tenant "
+                          f"{tenant} ...'[/red]")
+            raise typer.Exit(1)
         from souprise.core.hdc import SimpleHDCRetriever
         if verbose:
             console.print(f"[yellow]Loading index {index}...[/yellow]")
@@ -208,6 +248,10 @@ def query(
         None, help="JSON access policy file, applied before search"),
     audit: Optional[str] = typer.Option(
         None, help="Append-only SQLite audit log path"),
+    tenant: Optional[str] = typer.Option(
+        None, help="Tenant name; uses that tenant's index, audit and policies"),
+    tenant_dir: str = typer.Option(
+        "tenants", help="Base directory holding all tenants"),
 ):
     """Ask a single question and get an answer.
 
@@ -215,6 +259,7 @@ def query(
         souprise chat query "What are the open invoices?"
     """
     resolved_backend = resolve_backend(backend)
+    index, audit, policy = _resolve_tenant(tenant, tenant_dir, index, audit, policy)
     config = RAGConfig(
         retrieval_k=retrieval_k,
         model_path=model or DEFAULT_MODELS[resolved_backend],
@@ -228,6 +273,12 @@ def query(
         from souprise.core.access import load_policy
         active_policy = load_policy(policy)
     if index:
+        from pathlib import Path as _Path
+        if tenant and not _Path(index).exists():
+            console.print(f"[red]Tenant '{tenant}' has no index yet. Build "
+                          f"one with 'souprise index build --tenant "
+                          f"{tenant} ...'[/red]")
+            raise typer.Exit(1)
         from souprise.core.hdc import SimpleHDCRetriever
         rag.retriever = SimpleHDCRetriever.load(index)
     else:

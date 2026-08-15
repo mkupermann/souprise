@@ -11,6 +11,7 @@ from rich.console import Console
 
 from .chat import app as chat_app
 from .index import app as index_app
+from .tenant import app as tenant_app
 from .train import app as train_app
 
 app = typer.Typer(
@@ -24,6 +25,7 @@ app = typer.Typer(
 app.add_typer(chat_app, name="chat", help="Interactive chat with business data")
 app.add_typer(train_app, name="train", help="Fine-tune LLMs with synthetic data")
 app.add_typer(index_app, name="index", help="Manage the HDC index")
+app.add_typer(tenant_app, name="tenant", help="Manage isolated tenants")
 
 
 @app.command()
