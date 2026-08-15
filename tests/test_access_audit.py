@@ -111,6 +111,28 @@ class TestAuditLog:
         assert (AuditLog(audit_path).events()[-1]["answer_sha256"]
                 == hashlib.sha256(result.answer.encode()).hexdigest())
 
+    def test_hash_chain_verifies_and_detects_tampering(self, tmp_path):
+        audit_path = str(tmp_path / "audit.db")
+        rag = build_rag(audit_path=audit_path)
+        rag.query("What is the amount for EU_01?", policy=EU_SALES)
+        rag.query("What is the amount for EU_02?", policy=EU_SALES)
+        rag.query("What is the margin for EU_01?", policy=EU_SALES)
+
+        log = AuditLog(audit_path)
+        ok, bad = log.verify()
+        assert ok and bad is None
+
+        # An admin with file access can drop the triggers and edit a row;
+        # the chain must expose exactly that.
+        con = sqlite3.connect(audit_path)
+        con.execute("DROP TRIGGER events_no_update")
+        con.execute("UPDATE events SET question='tampered' WHERE id=2")
+        con.commit()
+        con.close()
+        ok, bad = log.verify()
+        assert not ok
+        assert bad == 2
+
     def test_append_only_enforced_by_triggers(self, tmp_path):
         audit_path = str(tmp_path / "audit.db")
         rag = build_rag(audit_path=audit_path)
