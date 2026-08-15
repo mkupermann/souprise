@@ -130,17 +130,49 @@ class SimpleHDCRetriever(BaseRetriever):
             len(entries), time.perf_counter() - start, self._packed.nbytes,
         )
 
+    def _positions_by_id(self) -> Dict[str, int]:
+        return {str(e.get("id", i)): i for i, e in enumerate(self._entries)}
+
     def add(self, entries: List[Dict[str, Any]]) -> None:
-        """Append entries to the existing index without re-encoding it.
+        """Upsert entries into the existing index without re-encoding it.
+
+        Entries whose id already exists replace the stored record and its
+        vector; new ids are appended. Only the given entries are encoded.
 
         Args:
             entries: List of dicts with 'id', 'text', and optionally 'metadata'.
         """
         if not entries:
             return
-        vectors = [self._encode(entry["text"]) for entry in entries]
-        self._packed = np.vstack([self._packed, *vectors])
-        self._entries.extend(entries)
+        positions = self._positions_by_id()
+        new_vectors: List[np.ndarray] = []
+        for entry in entries:
+            vector = self._encode(entry["text"])
+            entry_id = str(entry.get("id", ""))
+            if entry_id and entry_id in positions:
+                pos = positions[entry_id]
+                self._packed[pos] = vector
+                self._entries[pos] = entry
+            else:
+                new_vectors.append(vector)
+                self._entries.append(entry)
+                if entry_id:
+                    positions[entry_id] = len(self._entries) - 1
+        if new_vectors:
+            self._packed = np.vstack([self._packed, *new_vectors])
+
+    def delete(self, ids: List[str]) -> int:
+        """Remove entries by id. Returns the number of entries removed."""
+        drop = set(str(i) for i in ids)
+        keep = [
+            i for i, e in enumerate(self._entries)
+            if str(e.get("id", i)) not in drop
+        ]
+        removed = len(self._entries) - len(keep)
+        if removed:
+            self._packed = self._packed[keep]
+            self._entries = [self._entries[i] for i in keep]
+        return removed
 
     def _hamming_distances(self, query_vec: np.ndarray) -> np.ndarray:
         """Hamming distances from the query to every indexed vector.

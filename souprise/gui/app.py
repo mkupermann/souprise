@@ -94,6 +94,13 @@ if question:
         result = rag.query(question, k=k)
         st.subheader("Answer")
         st.write(result.answer)
+        if result.ungrounded_numbers:
+            st.error("Caution: these figures are not in the retrieved records: "
+                     + ", ".join(result.ungrounded_numbers))
+        if result.aggregation_hint:
+            st.warning("This looks like an aggregate question. Top-k retrieval "
+                       "only sees a few records; totals and averages need a "
+                       "database query.")
         col1, col2, col3 = st.columns(3)
         col1.metric("Retrieval", f"{result.retrieval_latency * 1000:.1f} ms")
         col2.metric("Generation", f"{result.generation_latency * 1000:.1f} ms")

@@ -101,7 +101,7 @@ training:
   epochs: 3
   lr: 2e-5
   batch_size: 4
-  optimizer: adamw
+  optimizer: adamw_torch
   lora:
     r: 16
     alpha: 32

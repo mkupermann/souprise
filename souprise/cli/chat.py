@@ -126,6 +126,15 @@ def chat(
                 # Print answer
                 console.print("[bold green]Answer:[/bold green]")
                 console.print(result.answer)
+                if result.ungrounded_numbers:
+                    console.print(f"[red]Caution: these figures are not in the "
+                                  f"retrieved records: "
+                                  f"{', '.join(result.ungrounded_numbers)}[/red]")
+                if result.aggregation_hint:
+                    console.print("[yellow]Note: this looks like an aggregate "
+                                  "question. Top-k retrieval only sees a few "
+                                  "records; totals and averages need a database "
+                                  "query.[/yellow]")
                 console.print()
 
                 if verbose:
@@ -177,4 +186,10 @@ def query(
     # Print result
     console.print(f"[bold blue]Question:[/bold blue] {question}")
     console.print(f"[bold green]Answer:[/bold green] {result.answer}")
+    if result.ungrounded_numbers:
+        console.print(f"[red]Caution: these figures are not in the retrieved "
+                      f"records: {', '.join(result.ungrounded_numbers)}[/red]")
+    if result.aggregation_hint:
+        console.print("[yellow]Note: aggregate questions (totals, averages) "
+                      "need a database query, not top-k retrieval.[/yellow]")
     console.print(f"[dim]Total latency: {result.total_latency*1000:.2f}ms[/dim]")
