@@ -1,106 +1,124 @@
-"""Index command for Souprise.
-
-Provides commands for managing the HDC index.
+"""Index commands: build, inspect, and query persistent HDC indexes.
 
 License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
-import json
+from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
-from souprise.core.pipeline import SoupriseRAG
-from souprise.data.generators.business import generate_business_data
-
-app = typer.Typer(help="Manage the HDC index for business data.")
+app = typer.Typer(help="Build and query persistent HDC indexes.")
 console = Console()
 
 
+def _split(option: Optional[str]) -> Optional[List[str]]:
+    return [part.strip() for part in option.split(",")] if option else None
+
+
 @app.command()
-def create(
-    data_path: str = typer.Option(
-        None,
-        help="Path to JSONL file with data to index. If None, generates synthetic data."
+def build(
+    output: str = typer.Option("souprise_index.db", help="Path of the index file to write"),
+    from_csv: Optional[str] = typer.Option(None, help="Build from a CSV file"),
+    from_xlsx: Optional[str] = typer.Option(None, help="Build from an Excel workbook"),
+    from_jsonl: Optional[str] = typer.Option(None, help="Build from a JSONL file"),
+    from_postgres: Optional[str] = typer.Option(
+        None, help="Build from PostgreSQL; a SQLAlchemy DSN like postgresql://user@host/db"
     ),
-    n: int = typer.Option(
-        10000,
-        help="Number of synthetic entries to generate (used if data_path is None)"
+    query: Optional[str] = typer.Option(
+        None, help="SELECT statement (required with --from-postgres)"
     ),
-    seed: int = typer.Option(
-        42,
-        help="Random seed for synthetic data"
+    sheet: Optional[str] = typer.Option(None, help="Excel sheet name (default: active)"),
+    id_column: Optional[str] = typer.Option(None, help="Column to use as entry id"),
+    text_columns: Optional[str] = typer.Option(
+        None, help="Comma-separated columns for the searchable text (default: all)"
     ),
-    output_path: str = typer.Option(
-        "./souprise_index",
-        help="Directory to save the index (not implemented in HDC yet)"
+    tag_columns: Optional[str] = typer.Option(
+        None, help="Comma-separated columns whose values become tags"
     ),
+    synthetic: Optional[int] = typer.Option(
+        None, help="Build from N synthetic business records instead of a file"
+    ),
+    seed: int = typer.Option(42, help="Seed for --synthetic"),
 ):
-    """Create an HDC index from business data.
+    """Build a persistent HDC index from CSV, Excel, JSONL, PostgreSQL, or synthetic data.
 
-    Example:
-        souprise index create --data-path my_data.jsonl
-        souprise index create --n 5000  # Generate synthetic data
+    Examples:
+        souprise index build --from-csv invoices.csv --id-column invoice_id
+        souprise index build --from-postgres postgresql://localhost/erp \\
+            --query "SELECT id, customer, amount, status FROM invoices" --id-column id
+        souprise index build --synthetic 10000
     """
-    rag = SoupriseRAG()
+    from souprise.core.hdc import SimpleHDCRetriever
+    from souprise.data import importers
 
-    if data_path:
-        # Load from file
-        with open(data_path, "r") as f:
-            entries = [
-                {
-                    "id": f"entry_{i}",
-                    "text": json.dumps(line),
-                    "metadata": {}
-                }
-                for i, line in enumerate(f)
-            ]
-        console.print(f"[yellow]Loading data from {data_path}...[/yellow]")
+    sources = [s for s in (from_csv, from_xlsx, from_jsonl, from_postgres, synthetic) if s]
+    if len(sources) != 1:
+        console.print("[red]Choose exactly one source: --from-csv, --from-xlsx, "
+                      "--from-jsonl, --from-postgres, or --synthetic.[/red]")
+        raise typer.Exit(1)
+
+    text_cols, tag_cols = _split(text_columns), _split(tag_columns)
+
+    if from_csv:
+        entries = importers.load_csv(from_csv, id_column, text_cols, tag_cols)
+    elif from_xlsx:
+        entries = importers.load_excel(from_xlsx, sheet, id_column, text_cols, tag_cols)
+    elif from_jsonl:
+        entries = importers.load_jsonl(from_jsonl)
+    elif from_postgres:
+        if not query:
+            console.print("[red]--from-postgres requires --query.[/red]")
+            raise typer.Exit(1)
+        entries = importers.load_postgres(from_postgres, query, id_column, text_cols, tag_cols)
     else:
-        # Generate synthetic data
-        entries = generate_business_data(n=n, seed=seed)
-        entries = [
-            {
-                "id": entry.title,
-                "text": f"{entry.title}\n{entry.content}",
-                "metadata": {"tags": entry.tags}
-            }
-            for entry in entries
-        ]
-        console.print(f"[yellow]Generating {n} synthetic business entries...[/yellow]")
+        from souprise.data.generators.business import generate_business_data
+        entries = [e.to_retrieval_format() for e in generate_business_data(n=synthetic, seed=seed)]
 
-    # Index data
-    rag.index_from_entries(entries)
-    console.print(f"[green]Indexed {len(entries)} entries[/green]")
-    console.print("[yellow]Note: Current HDC implementation keeps index in memory only[/yellow]")
-    console.print("[yellow]For persistent storage, see the JuiceHDC documentation[/yellow]")
+    if not entries:
+        console.print("[red]Source produced no entries.[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[yellow]Encoding {len(entries):,} entries...[/yellow]")
+    retriever = SimpleHDCRetriever()
+    retriever.index(entries)
+    retriever.save(output)
+    console.print(f"[green]Indexed {retriever.size:,} entries "
+                  f"({retriever.index_bytes / 1_000_000:.2f} MB of vectors) -> {output}[/green]")
 
 
 @app.command()
 def info(
-    data_size: int = typer.Option(10000, help="Number of entries"),
+    path: str = typer.Option("souprise_index.db", help="Index file to inspect"),
 ):
-    """Show information about the HDC index.
+    """Show statistics of a persistent index."""
+    from souprise.core.hdc import PACKED_BYTES, SimpleHDCRetriever
 
-    Example:
-        souprise index info --data-size 10000
-    """
-    # Generate sample data to show stats
-    entries = generate_business_data(n=data_size, seed=42)
+    retriever = SimpleHDCRetriever.load(path)
+    table = Table(title=f"Index: {path}")
+    table.add_column("Property")
+    table.add_column("Value")
+    table.add_row("Entries", f"{retriever.size:,}")
+    table.add_row("Vector size", f"{PACKED_BYTES:,} bytes (10,000 bits)")
+    table.add_row("Vector storage", f"{retriever.index_bytes / 1_000_000:.2f} MB")
+    console.print(table)
 
-    # Count by category
-    categories = {}
-    for entry in entries:
-        cat = entry.tags[0] if entry.tags else "unknown"
-        categories[cat] = categories.get(cat, 0) + 1
 
-    console.print("[bold blue]HDC Index Statistics[/bold blue]")
-    console.print(f"Total entries: {len(entries)}")
-    console.print("Vector dimension: 10,000 bits (HDC)")
-    console.print("Storage per entry: ~1.25 KB (packed)")
-    console.print(f"Total storage: ~{len(entries) * 1.25 / 1024:.2f} MB")
-    console.print()
-    console.print("[bold]Entries by category:[/bold]")
-    for cat, count in sorted(categories.items()):
-        console.print(f"  {cat}: {count} ({count/len(entries)*100:.1f}%)")
+@app.command("query")
+def query_index(
+    question: str = typer.Argument(..., help="The search query"),
+    path: str = typer.Option("souprise_index.db", help="Index file to search"),
+    k: int = typer.Option(5, help="Number of results"),
+):
+    """Search a persistent index directly, without loading an LLM."""
+    from souprise.core.hdc import SimpleHDCRetriever
+
+    retriever = SimpleHDCRetriever.load(path)
+    for result in retriever.search(question, k=k):
+        console.print(f"[bold cyan]{result.score:.3f}[/bold cyan]  "
+                      f"[bold]{result.title}[/bold]")
+        lines = [line for line in result.content.splitlines() if line != result.title]
+        if lines:
+            console.print(f"  {lines[0][:100]}")

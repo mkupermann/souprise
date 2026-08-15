@@ -14,8 +14,10 @@ Copyright 2026 Michael Kupermann
 """
 
 import hashlib
+import json
 import logging
 import re
+import sqlite3
 import time
 from typing import Any, Dict, List
 
@@ -27,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 DIMENSIONS = 10_000  # bits per hypervector
 PACKED_BYTES = DIMENSIONS // 8  # 1,250 bytes per entry
+INDEX_SCHEMA_VERSION = 1
+# Vectors are persisted in blocks of this many rows (~82 MB per block),
+# well under SQLite's 1 GB single-blob limit even for huge corpora.
+_SAVE_BLOCK_ROWS = 65_536
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -184,3 +190,87 @@ class SimpleHDCRetriever(BaseRetriever):
         self._packed = np.empty((0, PACKED_BYTES), dtype=np.uint8)
         self._entries = []
         self._token_cache = {}
+
+    def save(self, path: str) -> None:
+        """Persist the index to a SQLite file.
+
+        Stores entries (id, text, metadata) and the packed hypervector
+        matrix in row blocks. The file is self-contained; load() restores
+        an identical retriever without re-encoding anything.
+        """
+        con = sqlite3.connect(path)
+        try:
+            con.executescript(
+                "DROP TABLE IF EXISTS meta;"
+                "DROP TABLE IF EXISTS entries;"
+                "DROP TABLE IF EXISTS vector_blocks;"
+                "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);"
+                "CREATE TABLE entries (pos INTEGER PRIMARY KEY, id TEXT,"
+                " text TEXT, metadata TEXT);"
+                "CREATE TABLE vector_blocks (block INTEGER PRIMARY KEY, data BLOB);"
+            )
+            con.executemany("INSERT INTO meta VALUES (?, ?)", [
+                ("schema_version", str(INDEX_SCHEMA_VERSION)),
+                ("dimensions", str(DIMENSIONS)),
+                ("entry_count", str(len(self._entries))),
+            ])
+            con.executemany(
+                "INSERT INTO entries VALUES (?, ?, ?, ?)",
+                (
+                    (i, str(e.get("id", i)), e["text"],
+                     json.dumps(e.get("metadata") or {}))
+                    for i, e in enumerate(self._entries)
+                ),
+            )
+            con.executemany(
+                "INSERT INTO vector_blocks VALUES (?, ?)",
+                (
+                    (b, self._packed[start:start + _SAVE_BLOCK_ROWS].tobytes())
+                    for b, start in enumerate(
+                        range(0, self._packed.shape[0], _SAVE_BLOCK_ROWS))
+                ),
+            )
+            con.commit()
+        finally:
+            con.close()
+        logger.info("Saved %d entries to %s", len(self._entries), path)
+
+    @classmethod
+    def load(cls, path: str, chunk_rows: int = 65_536) -> "SimpleHDCRetriever":
+        """Load an index previously written by save().
+
+        Restores entries and the packed hypervector matrix without
+        re-encoding, so loading a million-entry index takes seconds,
+        not minutes.
+        """
+        con = sqlite3.connect(path)
+        try:
+            meta = dict(con.execute("SELECT key, value FROM meta"))
+            if int(meta.get("dimensions", -1)) != DIMENSIONS:
+                raise ValueError(
+                    f"Index at {path} uses {meta.get('dimensions')} bit vectors; "
+                    f"this build expects {DIMENSIONS}."
+                )
+            retriever = cls(chunk_rows=chunk_rows)
+            retriever._entries = [
+                {"id": entry_id, "text": text, "metadata": json.loads(metadata)}
+                for entry_id, text, metadata in con.execute(
+                    "SELECT id, text, metadata FROM entries ORDER BY pos")
+            ]
+            blocks = [
+                np.frombuffer(data, dtype=np.uint8).reshape(-1, PACKED_BYTES)
+                for (data,) in con.execute(
+                    "SELECT data FROM vector_blocks ORDER BY block")
+            ]
+            if blocks:
+                retriever._packed = np.vstack(blocks)
+            expected = int(meta.get("entry_count", len(retriever._entries)))
+            if retriever._packed.shape[0] != expected:
+                raise ValueError(
+                    f"Index at {path} is corrupt: {retriever._packed.shape[0]} "
+                    f"vectors for {expected} entries."
+                )
+        finally:
+            con.close()
+        logger.info("Loaded %d entries from %s", len(retriever._entries), path)
+        return retriever

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "souprise"
-version = "0.1.0"
+version = "0.2.0"
 description = "Private business AI toolkit: synthetic data, LoRA fine-tuning workflow, HDC retrieval, offline RAG"
 readme = "README.md"
 license = "Apache-2.0"
@@ -49,16 +49,19 @@ finetune = ["soup-cli>=0.73.1"]
 juicehdc = [
     "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@v0.2.0#subdirectory=cortex-hdc",
 ]
-# Planned REST API mode (v0.2)
+# Planned REST API mode
 api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "pydantic>=2.0.0"]
-# Planned database connectors (v0.2)
+# Excel importer
+excel = ["openpyxl>=3.1.0"]
+# PostgreSQL connector
 postgres = ["psycopg2-binary>=2.9.9", "sqlalchemy>=2.0.0"]
-# Development: tests and linting run against core only, no git dependencies
+# Development: tests and linting; no git dependencies
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "openpyxl>=3.1.0",
 ]
 
 [project.scripts]

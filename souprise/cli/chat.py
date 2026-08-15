@@ -31,9 +31,14 @@ def chat(
         "auto",
         help="Backend: 'auto' (detect), 'mlx' (Apple Silicon), 'torch' (CUDA/ROCm/CPU)"
     ),
+    index: Optional[str] = typer.Option(
+        None,
+        help="Persistent index file built with 'souprise index build'. "
+             "When omitted, synthetic data is generated and indexed in memory."
+    ),
     data_size: int = typer.Option(
         10000,
-        help="Number of synthetic business entries to generate"
+        help="Number of synthetic business entries to generate (ignored with --index)"
     ),
     retrieval_k: int = typer.Option(
         5,
@@ -83,11 +88,15 @@ def chat(
 
     rag = SoupriseRAG(config=config)
 
-    if verbose:
-        console.print("[yellow]Generating synthetic business data...[/yellow]")
-
-    # Generate and index synthetic data
-    rag.index_from_business_data(n=data_size, seed=42)
+    if index:
+        from souprise.core.hdc import SimpleHDCRetriever
+        if verbose:
+            console.print(f"[yellow]Loading index {index}...[/yellow]")
+        rag.retriever = SimpleHDCRetriever.load(index)
+    else:
+        if verbose:
+            console.print("[yellow]Generating synthetic business data...[/yellow]")
+        rag.index_from_business_data(n=data_size, seed=42)
 
     if verbose:
         console.print(f"[yellow]Loading LLM model: {model}...[/yellow]")
@@ -139,7 +148,8 @@ def query(
     question: str = typer.Argument(..., help="The question to ask"),
     model: Optional[str] = typer.Option(None, help="Model path or ID"),
     backend: str = typer.Option("auto", help="Backend: 'auto', 'mlx', or 'torch'"),
-    data_size: int = typer.Option(10000, help="Number of data entries"),
+    index: Optional[str] = typer.Option(None, help="Persistent index file to load"),
+    data_size: int = typer.Option(10000, help="Number of data entries (ignored with --index)"),
     retrieval_k: int = typer.Option(5, help="Number of retrieval results"),
 ):
     """Ask a single question and get an answer.
@@ -154,7 +164,11 @@ def query(
         backend=resolved_backend
     )
     rag = SoupriseRAG(config=config)
-    rag.index_from_business_data(n=data_size, seed=42)
+    if index:
+        from souprise.core.hdc import SimpleHDCRetriever
+        rag.retriever = SimpleHDCRetriever.load(index)
+    else:
+        rag.index_from_business_data(n=data_size, seed=42)
     rag.load_model()
 
     # Execute query

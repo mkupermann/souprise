@@ -122,6 +122,31 @@ When an exact linear scan stops being fast enough for you, swap in the optional 
 
 Anything that implements `BaseRetriever` (`index`, `search`, `clear`) can be assigned to `rag.retriever` directly. Same for `BaseGenerator` and custom inference backends.
 
+## Persistent Indexes and Connectors
+
+Encoding happens once, not on every start. `souprise index build` writes a self-contained SQLite file with the entries and the packed hypervector matrix, and loading it back takes seconds because nothing gets re-encoded. Your data comes in through four doors.
+
+```bash
+# From a CSV export (delimiter is sniffed, works with ; and tab too)
+souprise index build --from-csv invoices.csv --id-column invoice_id --tag-columns status
+
+# From an Excel workbook
+souprise index build --from-xlsx export.xlsx --sheet Invoices --id-column invoice_id
+
+# Straight from PostgreSQL
+souprise index build --from-postgres postgresql://user@localhost/erp \
+    --query "SELECT id, customer, amount, status FROM invoices" --id-column id
+
+# Inspect and search the index without loading any model
+souprise index info --path souprise_index.db
+souprise index query "overdue invoices ACME" --path souprise_index.db
+
+# Chat against the persistent index
+souprise chat --index souprise_index.db --model ./souprise_model
+```
+
+The same works in code through `souprise.data.importers` (`load_csv`, `load_excel`, `load_jsonl`, `load_postgres`) and `SimpleHDCRetriever.save(path)` / `SimpleHDCRetriever.load(path)`. Rows are rendered as plain "Column: value" text, the same shape the synthetic generators produce, so a model fine-tuned on the synthetic data feels at home with your real records. The Postgres path is covered by a round-trip test against a real database in CI.
+
 ## Installation
 
 ```bash
@@ -137,6 +162,8 @@ pip install -e .                # core: retrieval, data generators, CLI
 | CUDA / ROCm / CPU inference | `pip install -e ".[torch]"` |
 | Fine-tuning with Soup | `pip install -e ".[finetune]"` plus `soup-cli[mlx]` (Apple Silicon) or `soup-cli[train]` (CUDA/CPU) |
 | JuiceHDC retrieval engine | `pip install -e ".[juicehdc]"` |
+| Excel importer | `pip install -e ".[excel]"` |
+| PostgreSQL connector | `pip install -e ".[postgres]"` |
 | Development (tests, lint) | `pip install -e ".[dev]"` |
 
 ## Quick Start
@@ -238,7 +265,9 @@ The default mix at `seed=42` is 30 % invoices, 25 % orders, 20 % customer profil
 | `souprise train generate` | Generate Alpaca-format training data |
 | `souprise train create-config` | Write a Soup fine-tuning configuration |
 | `souprise train all` | Data and configuration in one step |
-| `souprise index` | Manage the HDC index |
+| `souprise index build` | Build a persistent index from CSV, Excel, JSONL, PostgreSQL, or synthetic data |
+| `souprise index info` | Show statistics of a persistent index |
+| `souprise index query "<question>"` | Search a persistent index without loading an LLM |
 | `souprise info` | Show installed backends and versions |
 | `souprise version` | Show version |
 
@@ -278,13 +307,14 @@ CI runs the suite on Python 3.10 through 3.13 across Linux, macOS and Windows, o
 
 ## Project Status
 
-Alpha, v0.1.0. Pipeline, CLI, built-in retriever and data generators are built and tested. Persistence and connectors come next.
+Alpha, v0.2.0. Pipeline, CLI, built-in retriever, data generators, persistent indexes and the CSV/Excel/JSONL/Postgres doors are built and tested.
 
 | Version | Scope |
 |---|---|
-| v0.1 (current) | Built-in HDC retrieval (tested to 25k+ records), auto-detected MLX/PyTorch generation, CLI, synthetic data generators, cross-platform CI, retrieval benchmark |
-| v0.2 | Persistent HDC storage (SQLite), Postgres connector, REST API, multi-turn chat, standardized benchmark suite |
-| v0.3 | SAP and DATEV integration, Excel/CSV importers, authentication and RBAC, multi-tenant |
+| v0.1 | Built-in HDC retrieval (tested to 25k+ records), auto-detected MLX/PyTorch generation, CLI, synthetic data generators, cross-platform CI, retrieval benchmark |
+| v0.2 (current) | Persistent SQLite indexes (`souprise index build/info/query`, `--index` in chat), CSV/Excel/JSONL importers, PostgreSQL connector with a real-database CI test |
+| v0.2.x | REST API, multi-turn chat, standardized benchmark suite |
+| v0.3 | SAP and DATEV integration, authentication and RBAC, multi-tenant |
 | v1.0 | Production deployment options, observability, HD-NSW approximate index for very large corpora |
 
 ## Ecosystem

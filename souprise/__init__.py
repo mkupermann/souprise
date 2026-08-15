@@ -24,7 +24,7 @@ License: Apache-2.0
 Copyright 2026 Michael Kupermann
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from souprise.core.hdc import SimpleHDCRetriever
 from souprise.core.pipeline import (
