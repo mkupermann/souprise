@@ -25,13 +25,14 @@ TEMPLATE = ("Kurzüberblick: {summary}\n"
 class TestGlossaryAndTemplate:
     def test_load_glossary(self, tmp_path):
         path = tmp_path / "g.csv"
-        path.write_text("generic,company\ninvoice,Faktura\ncustomer,Geschäftspartner\n")
+        path.write_text("generic,company\ninvoice,Faktura\ncustomer,Geschäftspartner\n",
+                        encoding="utf-8")
         assert load_glossary(str(path)) == {"invoice": "Faktura",
                                             "customer": "Geschäftspartner"}
 
     def test_empty_glossary_raises(self, tmp_path):
         path = tmp_path / "g.csv"
-        path.write_text("generic,company\n")
+        path.write_text("generic,company\n", encoding="utf-8")
         with pytest.raises(ValueError):
             load_glossary(str(path))
 
@@ -67,20 +68,20 @@ class TestStyleGeneration:
 
     def test_write_style_training(self, tmp_path):
         g = tmp_path / "g.csv"
-        g.write_text("generic,company\ninvoice,Faktura\n")
+        g.write_text("generic,company\ninvoice,Faktura\n", encoding="utf-8")
         t = tmp_path / "t.txt"
-        t.write_text(TEMPLATE)
+        t.write_text(TEMPLATE, encoding="utf-8")
         out = tmp_path / "out.jsonl"
         count = write_style_training(str(g), str(t), str(out), n=5, seed=1)
         assert count == 5
-        lines = out.read_text().strip().splitlines()
+        lines = out.read_text(encoding="utf-8").strip().splitlines()
         assert len(lines) == 5
         assert {"instruction", "input", "output"} <= set(json.loads(lines[0]))
 
     def test_template_without_summary_raises(self, tmp_path):
         g = tmp_path / "g.csv"
-        g.write_text("generic,company\ninvoice,Faktura\n")
+        g.write_text("generic,company\ninvoice,Faktura\n", encoding="utf-8")
         t = tmp_path / "t.txt"
-        t.write_text("no placeholder here")
+        t.write_text("no placeholder here", encoding="utf-8")
         with pytest.raises(ValueError):
             write_style_training(str(g), str(t), str(tmp_path / "o.jsonl"), n=2)

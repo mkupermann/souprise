@@ -44,7 +44,7 @@ def main():
 
     glossary = load_glossary(args.glossary)
     company_terms = [t.lower() for t in glossary.values()]
-    markers = template_markers(Path(args.answer_template).read_text())
+    markers = template_markers(Path(args.answer_template).read_text(encoding="utf-8"))
 
     entries = generate_business_data(n=2000, seed=123)
     retriever = SimpleHDCRetriever()
