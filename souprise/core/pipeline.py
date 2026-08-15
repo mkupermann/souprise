@@ -119,7 +119,7 @@ class HDCRetriever(BaseRetriever):
     """HDC-based retriever using JuiceHDC's KnowledgeStore.
 
     Requires: pip install
-    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main#subdirectory=cortex-hdc"
+    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@v0.2.0#subdirectory=cortex-hdc"
     """
 
     def __init__(self):
@@ -137,7 +137,7 @@ class HDCRetriever(BaseRetriever):
         except ImportError as e:
             raise ImportError(
                 "JuiceHDC not installed. Install with: pip install "
-                '"cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main'
+                '"cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@v0.2.0'
                 '#subdirectory=cortex-hdc"'
             ) from e
 

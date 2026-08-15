@@ -47,7 +47,7 @@ torch = ["torch>=2.0.0", "transformers>=4.40.0"]
 finetune = ["soup-cli>=0.73.1"]
 # Optional JuiceHDC retrieval engine (built-in retriever needs no extra install)
 juicehdc = [
-    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main#subdirectory=cortex-hdc",
+    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@v0.2.0#subdirectory=cortex-hdc",
 ]
 # Planned REST API mode (v0.2)
 api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "pydantic>=2.0.0"]
