@@ -55,6 +55,8 @@ class RAGResult:
     aggregation_hint: bool = False
     # Verified mode: values were copied from records, never generated.
     verified: bool = False
+    # The answer is a deterministic aggregate computed over all entries.
+    computed: bool = False
     # The system declined to answer (no/weak retrieval match).
     refused: bool = False
     # Conflicting records for the same entity; all candidates are listed.
@@ -160,6 +162,8 @@ class RAGConfig:
     backend: str = "auto"  # "auto", "mlx" (Apple Silicon), "torch" (CUDA/ROCm/CPU)
     retriever: str = "auto"  # "auto", "simple" (built-in), or "juicehdc"
     # "verified": values copied from records, no LLM on the factual path.
+    # "styled": deterministic facts, the LLM only phrases the sentence
+    #           behind an exact-figure gate.
     # "generative": LLM answers, hard-gated by the grounding check.
     answer_mode: str = "verified"
     min_retrieval_score: float = 0.52  # below this, verified mode refuses
@@ -559,25 +563,25 @@ class SoupriseRAG:
         retrieval_results = retriever.search(question, k=k)
         retrieval_latency = time.perf_counter() - retrieval_start
 
-        # Verified mode: no LLM on the factual path; values are copied.
-        if self.config.answer_mode == "verified":
-            from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
-            va = answer_verified(
-                question, retrieval_results,
-                min_score=self.config.min_retrieval_score,
-                template=self.config.answer_template or DEFAULT_TEMPLATE,
-            )
-            return RAGResult(
+        # Verified/styled modes: the factual core is deterministic.
+        if self.config.answer_mode in ("verified", "styled"):
+            deterministic = self._deterministic_answer(question, retrieval_results)
+            result = RAGResult(
                 question=question,
-                answer=va.text,
+                answer=deterministic["text"],
                 retrieval_results=retrieval_results,
                 retrieval_latency=retrieval_latency,
                 total_latency=retrieval_latency,
-                aggregation_hint=looks_like_aggregation(question),
-                verified=not va.refused,
-                refused=va.refused,
-                ambiguous=va.ambiguous,
+                aggregation_hint=(looks_like_aggregation(question)
+                                  and not deterministic["computed"]),
+                verified=deterministic["verified"],
+                computed=deterministic["computed"],
+                refused=deterministic["refused"],
+                ambiguous=deterministic["ambiguous"],
             )
+            if self.config.answer_mode == "styled" and not result.refused:
+                self._verbalize(result)
+            return result
 
         generator = self._get_generator()
 
@@ -651,6 +655,54 @@ ANSWER (based only on the records above):"""
             ambiguous=ambiguous,
             blocked_generation=blocked,
         )
+
+    def _all_entries(self) -> List[Dict[str, Any]]:
+        """Every indexed entry, for deterministic aggregation."""
+        retriever = self._get_retriever()
+        return getattr(retriever, "_entries", None) or self._entries
+
+    def _deterministic_answer(self, question, retrieval_results) -> Dict[str, Any]:
+        """Verified lookup or computed aggregate; code owns every figure."""
+        from souprise.core.compute import compute_aggregate
+        from souprise.core.verified import DEFAULT_TEMPLATE, answer_verified
+
+        if looks_like_aggregation(question):
+            computed = compute_aggregate(question, self._all_entries())
+            if computed is not None:
+                return {"text": computed.text, "verified": True,
+                        "computed": True, "refused": False, "ambiguous": False}
+
+        va = answer_verified(
+            question, retrieval_results,
+            min_score=self.config.min_retrieval_score,
+            template=self.config.answer_template or DEFAULT_TEMPLATE,
+        )
+        return {"text": va.text, "verified": not va.refused, "computed": False,
+                "refused": va.refused, "ambiguous": va.ambiguous}
+
+    def _verbalize(self, result: RAGResult) -> None:
+        """Have the LLM phrase the deterministic answer, behind an exact
+        gate: every figure in the text must come from the deterministic
+        answer or the question, otherwise the deterministic text stands."""
+        generator = self._get_generator()
+        prompt = (
+            "Rewrite the following facts as one or two natural sentences. "
+            "Use every number EXACTLY as written; do not add, round or "
+            "invent any figure.\n\n"
+            f"FACTS:\n{result.answer}\n\nQUESTION: {result.question}\n"
+            "ANSWER:"
+        )
+        generation_start = time.perf_counter()
+        gen = generator.generate(prompt, max_tokens=self.config.max_tokens,
+                                 temperature=self.config.temperature)
+        result.generation_latency = time.perf_counter() - generation_start
+        result.total_latency += result.generation_latency
+
+        mismatches = check_grounding(gen.text, result.answer, result.question)
+        if mismatches:
+            result.blocked_generation = gen.text
+        else:
+            result.answer = gen.text
 
     def chat(self, messages: List[Dict[str, str]]) -> str:
         """Chat interface for multi-turn conversations.

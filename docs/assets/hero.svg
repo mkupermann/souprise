@@ -75,7 +75,7 @@
 
   <!-- Wordmark -->
   <text x="1140" y="120" class="word" text-anchor="end" style="fill:url(#brandWord)">Souprise</text>
-  <text x="1140" y="150" class="tag" text-anchor="end">Private business AI, end to end</text>
+  <text x="1140" y="150" class="tag" text-anchor="end">Correct by construction. Private by design.</text>
 
   <!-- Chips -->
   <g>

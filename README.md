@@ -13,7 +13,13 @@
 
 </div>
 
-> Generate training data, fine-tune a domain model, index your records, then ask questions about invoices, orders, customers and KPIs. It all runs on your hardware. Point `model_path` at a local folder and nothing ever touches the network.
+> Ask questions about invoices, orders, customers and KPIs, on your own hardware, and get answers that are **correct by construction**: in the default verified mode every value is copied verbatim from your records, never generated. It all runs locally; point `model_path` at a local folder and nothing ever touches the network.
+
+**Correctness is priority one here, speed is priority two.** Three hard guarantees, each measured against pre-registered bars ([verified-mode report](benchmarks/results/verified_report.md)):
+
+1. **No generated figures.** The default [verified mode](#verified-answers) keeps the language model off the factual path — values are copied from cited records. Measured value accuracy: **1.000**.
+2. **Refusal beats guessing.** Unknown entities and weak retrieval get an explicit refusal, never the closest lookalike. Measured refusal rate on unknown entities: **1.000**; wrong values under conflicting records: **0.000** (all candidates are listed instead).
+3. **A hard gate on the generative mode.** Opting into LLM answers puts every figure through a grounding gate; anything not present in the retrieved records is replaced by the verified fallback before it ships. Measured shipped-fabrication rate: **0.000**.
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="souprise demo, recorded live. System info, training data generation, Soup config, a 10,000-record retrieval benchmark, and a grounded answer from a local model." width="1000"><br>
@@ -59,7 +65,7 @@ Souprise answers from your records, so the useful questions are the ones your te
 
 Three honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data works today through `souprise index build` with CSV, Excel, JSONL or a PostgreSQL query (see [Persistent Indexes and Connectors](#persistent-indexes-and-connectors)). Native SAP and DATEV integration is a roadmap item (v0.3), not a current feature.
 
-Third, and this one matters: **Souprise answers point lookups, not aggregates.** "Which invoices for ACME are overdue" works, because the relevant records fit into the retrieved context. "What is the total of all overdue invoices" does not, because top-k retrieval only ever sees k records; sums, averages and counts across the corpus belong in a database query. The chat surfaces a hint when a question looks aggregate-shaped.
+Third: **numbers never come from the model.** Point lookups copy values from records (verified mode). Aggregate questions — totals, counts, averages with filters like "all overdue invoices" — are computed deterministically in code over the whole index with Decimal arithmetic, measured exact against an independent reference in 40 of 40 cases ([report](benchmarks/results/compute_report.md)). Aggregates outside the parser's vocabulary get an honest hint, never a guessed figure.
 
 ## Verified Answers
 
@@ -67,17 +73,22 @@ Fabricated figures can't be reliably suppressed inside a language model, so the 
 
 Measured against the pre-registered BENCH-5 bars ([report](benchmarks/results/verified_report.md)): value accuracy **1.000** on 60 lookups, wrong-value rate **0.000** under entity ambiguity, refusal rate **1.000** on unknown entities. The generative mode stays available with `--mode generative` and sits behind a hard gate: an answer containing any figure not present in the retrieved records is replaced by the verified fallback before it ships — measured shipped-fabrication rate with the real local model: **0.000**.
 
+The division of labor is strict: **the LLM may write prose, code owns every number.** Aggregates (sum, count, average, min, max with filters) are computed deterministically over the whole index — exactness 1.000 against an independent reference. And if you want natural sentences instead of terse facts, `--mode styled` lets the model phrase the deterministic answer behind an exact-figure gate: any altered number and the deterministic text ships instead ([BENCH-6 report](benchmarks/results/compute_report.md), shipped-mismatch rate 0.000 with the real model).
+
 ```bash
-souprise chat query "What is the amount of the invoice for Customer_0042?"   # verified, default
-souprise chat query "Summarize Customer_0042's situation" --mode generative  # gated LLM
+souprise chat query "What is the amount of the invoice for Customer_0042?"      # verified, default
+souprise chat query "What is the total amount of all overdue invoices?"         # computed in code
+souprise chat query "What is the amount for Customer_0042?" --mode styled       # LLM phrases, code owns numbers
+souprise chat query "Summarize Customer_0042's situation" --mode generative     # gated LLM
 ```
 
-Precisely stated: verified answers guarantee that every value comes verbatim from a cited record. They do not guarantee the record itself is right — keep one current record per entity, and Souprise repeats your data faithfully.
+Precisely stated: verified answers guarantee that every value comes verbatim from a cited record, and computed answers are exact over the records the index holds. Neither guarantees the record itself is right — keep one current record per entity, and Souprise repeats your data faithfully.
 
 ## Design Principles
 
 | Principle | Implementation |
 |---|---|
+| Correctness first, speed second | Verified mode copies values from records instead of generating them; gates and refusals before eloquence. Fast anyway, but that's the bonus, not the goal |
 | Data sovereignty | Indexing, retrieval and generation run locally. No telemetry, no API keys at runtime |
 | Infrastructure-neutral | Linux, macOS and Windows. Backend auto-detection picks MLX or PyTorch per machine |
 | Verifiable claims | The HDC retriever ships in this repository, its storage and search behavior are covered by tests, and every `RAGResult` reports its own latencies |

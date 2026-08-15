@@ -33,9 +33,10 @@ def chat(
     ),
     mode: str = typer.Option(
         "verified",
-        help="'verified': values copied from records, no LLM on the factual "
-             "path (default). 'generative': LLM answers behind a hard "
-             "grounding gate."
+        help="'verified' (default): values copied from records, no LLM on "
+             "the factual path. 'styled': deterministic facts, LLM phrases "
+             "the sentence behind an exact gate. 'generative': LLM answers "
+             "behind a hard grounding gate."
     ),
     index: Optional[str] = typer.Option(
         None,
@@ -105,7 +106,7 @@ def chat(
             console.print("[yellow]Generating synthetic business data...[/yellow]")
         rag.index_from_business_data(n=data_size, seed=42)
 
-    if mode == "generative":
+    if mode in ("generative", "styled"):
         if verbose:
             console.print(f"[yellow]Loading LLM model: {model}...[/yellow]")
         try:
@@ -177,7 +178,8 @@ def query(
     model: Optional[str] = typer.Option(None, help="Model path or ID"),
     backend: str = typer.Option("auto", help="Backend: 'auto', 'mlx', or 'torch'"),
     mode: str = typer.Option("verified",
-                             help="'verified' (values copied from records) or "
+                             help="'verified' (values copied from records), "
+                                  "'styled' (LLM phrases, code owns numbers) or "
                                   "'generative' (LLM behind a grounding gate)"),
     index: Optional[str] = typer.Option(None, help="Persistent index file to load"),
     data_size: int = typer.Option(10000, help="Number of data entries (ignored with --index)"),
@@ -201,7 +203,7 @@ def query(
         rag.retriever = SimpleHDCRetriever.load(index)
     else:
         rag.index_from_business_data(n=data_size, seed=42)
-    if mode == "generative":
+    if mode in ("generative", "styled"):
         rag.load_model()
 
     # Execute query
