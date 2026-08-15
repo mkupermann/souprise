@@ -17,7 +17,7 @@
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="souprise demo, recorded live. System info, training data generation, Soup config, a 10,000-record retrieval benchmark, and a grounded answer from a local model." width="1000"><br>
-  <sub>Recorded live on an Apple M-series laptop, 62 seconds, nothing cut. 10,000 records indexed in 8 s, 3.8 ms median query, grounded answer from a local Qwen 0.5B in 1.4 s. Those are one machine's numbers, not a promise. Run <code>benchmarks/retrieval_bench.py</code> and get your own.</sub>
+  <sub>Recorded live on an Apple M-series laptop, nothing cut. The whole stack is loaded (MLX, JuiceHDC, Soup), 10,000 records index in 8 s with a 3.6 ms median query, and a local Qwen 0.5B answers a grounded question in 1.4 s. One machine's numbers, not a promise. Run <code>benchmarks/retrieval_bench.py</code> and get your own.</sub>
 </p>
 
 ---
@@ -46,6 +46,18 @@ Most RAG stacks run an embedding model plus a vector database. Souprise skips bo
 The retrieved records go to a local LLM, which you can fine-tune on your domain with [Soup](https://github.com/MakazhanAlpamys/Soup). And like Soup, Souprise doesn't care what machine you own. It detects MLX on Apple Silicon and falls back to PyTorch on NVIDIA CUDA, AMD ROCm or plain CPU. Same code, same commands, on Linux, macOS and Windows.
 
 **What touches the network, exactly.** The built-in retriever has no network path, full stop. `quickstart()` pulls a public base model from Hugging Face once, no API key needed. Point `model_path` at a local folder instead and there's no download and no connection at all, air gap included. Fine-tuning with Soup runs on your hardware too. Your business data is never sent anywhere, at any time. One caveat, and it's yours to own. If you inject a custom `BaseRetriever` or `BaseGenerator`, nobody can vouch for its network behavior but you.
+
+## What Your Teams Can Ask
+
+Souprise answers from your records, so the useful questions are the ones your teams already ask every day.
+
+| Team | Questions that work against the shipped data model | Backed by |
+|---|---|---|
+| Sales | Which invoices for Customer_0123 are overdue? What did a customer order last quarter, and for how much? Which A-segment customers in the EU haven't been contacted since March? | Invoices, orders, customer profiles |
+| Marketing | Which products are trending down despite high stock? Which segments carry the most annual revenue per region? How is the marketing budget tracking against its allocation? | Products, segments, KPIs, budgets |
+| Service | Which enterprise customers sit on more than five open tickets? What's the fulfillment status of a customer's last order? Which departments miss their satisfaction targets? | Customer profiles, orders, KPIs |
+
+Two honest notes on this. First, the shipped generators produce synthetic data, so you can try all of these questions in the demo before any real record is involved. Second, connecting real data today means exporting it and calling `index_from_entries`, three fields per record. SAP, DATEV and Excel importers are roadmap items (v0.3), not current features.
 
 ## Design Principles
 
@@ -88,6 +100,11 @@ The built-in retriever doesn't stop at 10,000 records.
 - **Hardware popcount** on NumPy 2.x, lookup-table fallback on older versions.
 - **Incremental indexing.** `add(entries)` appends new records without re-encoding what's already there.
 - **Linear storage.** 1,250 bytes per entry, so 100,000 records need 125 MB of index.
+
+<p align="center">
+  <img src="docs/assets/scale.gif" alt="Retrieval benchmark at 10,000 and then 1,000,000 records on the same machine" width="1000"><br>
+  <sub>Same laptop, same exact search, two corpus sizes. 10,000 records index in 8 s and answer in 3.8 ms. One million records build 1.25 GB of index in just under 8 minutes and answer in 371 ms median, with 20 of 20 self-retrieval hits. The recording pauses during the long build, nothing else is cut. One machine's numbers, not a promise.</sub>
+</p>
 
 ```bash
 # Measure on your own machine, any corpus size

@@ -102,6 +102,25 @@ class TestEndToEnd:
         with pytest.raises(ValueError):
             resolve_backend("tensorflow")
 
+    def test_juicehdc_retriever_end_to_end(self):
+        """Real JuiceHDC integration; runs only where cortex-hdc is installed."""
+        pytest.importorskip("cortex")
+        from souprise.core.pipeline import HDCRetriever
+
+        retriever = HDCRetriever()
+        retriever.index([
+            {"id": "INV-001", "text": "Invoice ACME Corp amount 12400 status overdue",
+             "metadata": {"tags": ["invoice"]}},
+            {"id": "PRD-001", "text": "Product AB stock 500 trend rising",
+             "metadata": {"tags": ["product"]}},
+        ])
+        results = retriever.search("overdue invoice ACME", k=2)
+        assert results[0].title == "INV-001"
+        assert 0.0 <= results[0].score <= 1.0
+        retriever.clear()
+        with pytest.raises(RuntimeError):
+            retriever.search("anything")
+
     def test_chat_uses_latest_user_message(self):
         rag = build_pipeline()
         answer = rag.chat([

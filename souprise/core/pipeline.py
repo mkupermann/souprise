@@ -116,15 +116,14 @@ class BaseGenerator:
 
 
 class HDCRetriever(BaseRetriever):
-    """HDC-based retriever using JuiceHDC.
+    """HDC-based retriever using JuiceHDC's KnowledgeStore.
 
-    This is a wrapper around the JuiceHDC library (cortex-hdc).
-    Requires: pip install git+https://github.com/mkupermann/JuiceHDC.git
+    Requires: pip install
+    "cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main#subdirectory=cortex-hdc"
     """
 
     def __init__(self):
         self._store = None
-        self._engine = None
         self._initialized = False
 
     def index(self, entries: List[Dict[str, Any]]) -> None:
@@ -134,29 +133,26 @@ class HDCRetriever(BaseRetriever):
             entries: List of dicts with 'id', 'text', and optionally 'metadata'.
         """
         try:
-            from cortex.encoder import CortexEncoder
-            from cortex.engine import HDCEngine
-            from cortex.store import KnowledgeStore
+            from cortex.store import KnowledgeEntry, KnowledgeStore
         except ImportError as e:
             raise ImportError(
-                "JuiceHDC not installed. Install with: "
-                "pip install git+https://github.com/mkupermann/JuiceHDC.git"
+                "JuiceHDC not installed. Install with: pip install "
+                '"cortex-hdc @ git+https://github.com/mkupermann/JuiceHDC.git@main'
+                '#subdirectory=cortex-hdc"'
             ) from e
 
-        # Initialize store and encoder
         store = KnowledgeStore()
-        encoder = CortexEncoder()
-
-        # Index each entry
         for entry in entries:
-            entry_id = entry.get("id", str(hash(entry["text"])))
-            store.add(entry_id, entry["text"], metadata=entry.get("metadata", {}))
+            tags = (entry.get("metadata") or {}).get("tags", [])
+            store.add(KnowledgeEntry(
+                title=str(entry.get("id", hash(entry["text"]))),
+                content=entry["text"],
+                tags=list(tags),
+            ))
 
-        # Initialize engine
         self._store = store
-        self._engine = HDCEngine(store, encoder)
         self._initialized = True
-        logger.info(f"Indexed {len(entries)} entries with HDC")
+        logger.info(f"Indexed {len(entries)} entries with JuiceHDC")
 
     def search(self, query: str, k: int = 5) -> List[RetrievalResult]:
         """Search for top-k results.
@@ -172,25 +168,26 @@ class HDCRetriever(BaseRetriever):
             raise RuntimeError("Retriever not initialized. Call index() first.")
 
         start_time = time.time()
-        results = self._engine.search(query, k=k)
+        # min_sim=0.0 keeps plain top-k semantics; JuiceHDC's default
+        # threshold (0.51) can return fewer than k results.
+        results = self._store.search(query, top_k=k, min_sim=0.0)
         latency = time.time() - start_time
 
         logger.debug(f"Retrieved {len(results)} results in {latency*1000:.2f}ms")
 
         return [
             RetrievalResult(
-                title=result.entry_id,
-                content=result.text,
-                score=result.score,
-                metadata=result.metadata or {}
+                title=entry.title,
+                content=entry.content,
+                score=float(similarity),
+                metadata={"tags": entry.tags}
             )
-            for result in results
+            for entry, similarity in results
         ]
 
     def clear(self) -> None:
         """Clear the index."""
         self._store = None
-        self._engine = None
         self._initialized = False
 
 
