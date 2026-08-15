@@ -69,3 +69,35 @@ constant?
 
 **Overall verifier.** `bash scripts/verify_review_fixes.sh` exits 0 iff the
 full test suite passes and every artifact above exists with real numbers.
+
+## BENCH-3: Fine-tuning failure analysis and applicability (pre-registered)
+
+Written and committed before any of these runs. Bars locked; no post-hoc
+tuning. Follow-up to BENCH-2's null result.
+
+**A. Error decomposition (descriptive, no bar).** Re-run the BENCH-2 eval
+capturing per-question records. Classify each miss mechanically:
+retrieval_miss (target record absent from the provided context) vs
+extraction_failure (target present, value not produced). Report counts and
+the tuned/untuned error overlap.
+
+**B. Scenario S1, harder contexts.** Same protocol as BENCH-2 but corpus
+5,000 and k=5 (more distractor records per prompt). Bar: tuning helps iff
+tuned - untuned >= +0.05. Otherwise: no benefit under distraction.
+
+**C. Scenario S2, format fidelity.** Metric "concise correctness": the
+expected value appears within the first 20 tokens of the answer. Training
+data was short templated answers, so this is where tuning should show if
+anywhere. Bar: tuning helps iff delta >= +0.05 on concise correctness.
+
+**D. Scenario S3, memorization negative control.** Same questions, NO
+records in the prompt. Expected: both models near zero. If tuned accuracy
+without context exceeds untuned by >= +0.10, the adapter memorized training
+facts — for daily-changing business data that is a defect, not a feature,
+and gets documented as a risk.
+
+**Applicability rule (locked).** If neither S1 nor S2 clears its bar, the
+README repositions fine-tuning as an optional, measure-first experiment
+outside the core pitch, and docs gain a "when to fine-tune" section with
+the measured evidence. If S1 or S2 clears its bar, that scenario gets
+documented as the recommended use case. S3 findings are reported either way.
